@@ -1,12 +1,12 @@
 class VoltageSource():
     
-    def __init__(self, name, n1, n2, vtype=None, dc=None, mag=None, phase=None):
+    def __init__(self, name, n1, n2, vtype=None, dc=None, ac=None, phase=None):
         self.name = name
         self.n1 = n1
         self.n2 = n2
         self.vtype = vtype
-        self.dc = dc
-        self.mag = mag
+        self.dc = float(dc)
+        self.ac = float(ac)
         self.phase = phase
 
     def get_vsource(self):
@@ -20,14 +20,14 @@ class VoltageSource():
         A[self.n2][iidx] = -1.0 
         A[iidx][self.n1] = +1.0 
         A[iidx][self.n2] = -1.0
-        z[iidx] = self.V()
+        z[iidx] = self.dc
 
-    def V(self):
-        if self.vtype.lower() == 'dc':
-            return self.dc
-        else:
-            print('WARNING: unknown voltage source')
-            return 0
+    def add_ac_stamps(self, A, z, x, iidx):
+        A[self.n1][iidx] = +1.0 
+        A[self.n2][iidx] = -1.0 
+        A[iidx][self.n1] = +1.0 
+        A[iidx][self.n2] = -1.0
+        z[iidx] = self.ac
 
     def __str__(self):
         out = ''

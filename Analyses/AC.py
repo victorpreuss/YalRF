@@ -34,43 +34,50 @@ options['iabstol'] = 1e-12
 
 class AC():
     
-    def __init__(self, name):
+    def __init__(self, name, start, stop, numpoints=10, stepsize=None, sweeptype='linear'):
         self.name = name
-        self.x = None
+
+        self.xac = None # matrix of complex solutions (each frequency is a column)
+        self.xdc = None
+
+        self.start = start
+        self.stop = stop
+        self.numpoints = numpoints
+        self.stepsize = stepsize
+        self.sweeptype = sweeptype
         
         self.n = 0 # number of nodes in the circuit with 'gnd'
         self.m = 0 # number of independent voltage sources
-
-        self.lin_devs = list()    # list of linear devices
-        self.nonlin_devs = list() # list of nonlinear devices
-        
-        self.iidx = dict() # map a current idx in the MNA to a device
+        self.iidx = {} # map a indep. vsource idx in the MNA to a device
+        self.lin_devs = []    # list of linear devices
+        self.nonlin_devs = [] # list of nonlinear devices
         
         self.options = options.copy() # DC simulation options
 
-    def run(self, circuit):
+        if sweeptype == 'linear':
+            if stepsize is not None:
+                self.freqs = np.arange(start, stop, step)
+            else:
+                self.freqs = np.linspace(start, stop, numpoints)
+        elif sweeptype == 'logarithm':
+            self.freqs = np.logspace(start, stop, numpoints)
+        else:
+            logger.warning('Failed to calculate the frequencies vector!')
+            self.freqs = np.array([start, stop])
+
+    def get_dc_solution(self):
+        return self.xdc
+
+    def run(self, y, x0=None):
         # Here we go!
         logger.info('Starting AC analysis.')
 
-        # clean-up
-        self.n = len(circuit.nodes)
-        self.m = 0
-        self.lin_devs.clear()
-        self.nonlin_devs.clear()
-        self.iidx.clear()
-
-        # map the number of extra rows required by each device
-        for dev in circuit.devices:
-            if dev.get_vsource() > 0:
-                self.iidx[dev] = self.n + self.m
-                self.m = self.m + dev.get_vsource()
-
-        # map all the linear and nonlinear devices
-        for dev in circuit.devices:
-            if dev.is_linear():
-                self.lin_devs.append(dev)
-            else:
-                self.nonlin_devs.append(dev)
+        # get netlist parameters and data structures
+        self.n = y.get_n()
+        self.m = y.get_m()
+        self.iidx = y.get_mna_extra_rows_dict()
+        self.lin_devs = y.get_linear_devices()
+        self.nonlin_devs = y.get_nonlinear_devices()
 
         # create MNA matrices for linear devices
         A = np.zeros((self.n+self.m, self.n+self.m))
@@ -98,27 +105,7 @@ class AC():
             if issolved:
                 return self.x
 
-        logger.info('Starting nonlinear DC solver ...')
-        issolved = self.solve_dc_nonlinear(A, z, x0)
-        if issolved:
-            return self.x
-
-        logger.info('Previous solver failed! Enabling gmin stepping algorithm ...')
-        issolved = self.solve_dc_nonlinear_using_gmin_stepping(A, z, x0)
-        if issolved:
-            return self.x
-
-        logger.info('Previous solver failed! Enabling source stepping algorithm ...')
-        issolved = self.solve_dc_nonlinear_using_source_stepping(A, z, x0)
-        if issolved:
-            return self.x
-
-        # TODO: implement line search algorithm here
-
-        logger.error('DC analysis failed to converge!')
-        return None
-    
-    def solve_dc_linear(self, A, z):
+    def solve_ac_linear(self, A, z):
         if self.options['is_sparse'] == True:
             An = scipy.sparse.csc_matrix(A[1:,1:])
             lu = scipy.sparse.linalg.splu(An)
