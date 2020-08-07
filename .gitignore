@@ -1,0 +1,9 @@
+notes
+tags
+
+*.pyc
+*.pyo
+
+__pycache__/
+Analyses/__pycache__/
+Devices/__pycache__/
