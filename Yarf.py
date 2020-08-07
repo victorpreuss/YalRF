@@ -1,27 +1,72 @@
 from .Devices import *
 from .Analyses import *
 
+import logging
+
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
+
+formatter = logging.Formatter('[%(levelname)s]: %(name)s: %(message)s')
+
+stream_handler = logging.StreamHandler()
+stream_handler.setFormatter(formatter)
+
+logger.addHandler(stream_handler)
+
 class Yarf():
     
     def __init__(self, name):
         self.name = name # circuit name given by the user
 
         # netlist related parameters
-        self.devices = list()   # list containing all the devices in the circuit
-        self.nodes = dict()     # dictionary to associate node names to index
-        self.node_name = list() # list of all the node names
-        self.nodes['gnd'] = 0   # initialize ground node
-        self.node_name.append('gnd')
+        self.devices = []           # list of all the devices
+        self.node_idx = {'gnd': 0}  # node names to index
+        self.node_name = ['gnd']    # index to node name
 
-        # analyses related parameters
-        self.analyses = dict() # dictionary of analysis to run in the circuit
+        # dictionary of analysis to run in the circuit
+        self.analyses = {} 
+
+    def get_device(self, name):
+        for dev in self.devices:
+            if dev.name == name:
+                return dev
+        return None
+
+    def get_analysis(self, name):
+        if name in self.analyses:
+            return self.analyses[name]
+        else:
+            logger.warning('Unknown analysis name: {}!'.format(name))
+            return None
+
+    def add_ac_analysis(self, name, start, stop, numpoints=10, sweeptype='linear', stepsize=None):
+        if name not in self.analyses:
+            self.analyses[name] = AC(name, start, stop, numpoints, sweeptype, stepsize)
+            return self.analyses[name]
+        else:
+            logger.warning('Analysis name \'{}\' already taken!'.format(name))
+            return None
+
+    def add_dc_analysis(self, name):
+        if name not in self.analyses:
+            self.analyses[name] = DC(name)
+            return self.analyses[name]
+        else:
+            logger.warning('Analysis name \'{}\' already taken!'.format(name))
+            return None
+
+    def run(self, name):
+        if name in self.analyses:
+            return self.analyses[name].run(self)
+        else:
+            logger.warning('Unknown analysis name: {}!'.format(name))
+            return None
 
     def add_node(self, n):
-        if n not in self.nodes:
-            self.nodes[n] = len(self.nodes)
+        if n not in self.node_idx:
+            self.node_idx[n] = len(self.node_idx)
             self.node_name.append(n)
-
-        return self.nodes[n]
+        return self.node_idx[n]
         
     def add_resistor(self, name, n1, n2, value):
         n1 = self.add_node(n1) # add node string and get the
@@ -63,11 +108,11 @@ class Yarf():
         self.devices.append(idc)
         return idc
 
-    def add_vsource(self, name, n1, n2, vtype=None, dc=None, mag=None, phase=None):
+    def add_vsource(self, name, n1, n2, vtype=None, dc=None, ac=None, phase=None):
         n1 = self.add_node(n1)
         n2 = self.add_node(n2)
         
-        vsource = VoltageSource(name, n1, n2, vtype, dc, mag, phase)
+        vsource = VoltageSource(name, n1, n2, vtype, dc, ac, phase)
         self.devices.append(vsource)
         return vsource
 
@@ -136,54 +181,90 @@ class Yarf():
         self.devices.append(bjt)
         return bjt
 
-    # TODO: implement this method using a dictionary for the devices
-    def get_device(self, name):
-        print('WARNING: method not implemented!')
-        return None
+    # returns the number of uniquely named nodes in the circuit
+    def get_n(self):
+        return len(self.node_name)
 
-    def get_analysis(self, name):
-        if name in self.analyses:
-            return self.analyses[name]
+    # returns the number of independent voltages
+    def get_m(self):
+        m = 0
+        for dev in self.devices:
+            m = m + dev.get_vsource()
+        return m
+
+    # given a node name, returns its index in the netlist
+    def get_node_idx(self, name):
+        if name in self.node_idx:
+            return self.node_idx[name]
         else:
-            print('WARNING: analysis name \'{}\' already taken!'.format(name))
             return None
 
-    def add_dc_analysis(self, name):
-        if name not in self.analyses:
-            self.analyses[name] = DC(name)
-            return self.analyses[name]
+    # given a node index in the netlist, returns its name
+    def get_node_name(self, idx):
+        if idx < len(self.node_name):
+            return self.node_name[idx]
         else:
-            print('WARNING: analysis name \'{}\' already taken!'.format(name))
             return None
+
+    # return a list of the linear devices in the netlist
+    def get_linear_devices(self):
+        lin_devs = []
+        for dev in self.devices:
+            if dev.is_linear():
+                lin_devs.append(dev)
+        return lin_devs
+
+    # return a list of the nonlinear devices in the netlist
+    def get_nonlinear_devices(self):
+        nonlin_devs = []
+        for dev in self.devices:
+            if not dev.is_linear():
+                nonlin_devs.append(dev)
+        return nonlin_devs
+
+    # return True if netlist is purely linear
+    def is_linear(self):
+        for dev in self.devices:
+            if dev.is_linear() == False:
+                return False
+        return True
+    
+    # return a dict which maps indep vsource idx in the MNA to a device
+    def get_mna_extra_rows_dict(self):
+        n = self.get_n()
+        k = 0
+        iidx = {}
+        for dev in self.devices:
+            if dev.get_vsource() > 0:
+                iidx[dev] = n + k
+                k = k + dev.get_vsource()
+        return iidx
 
     def print_dc_voltages(self, name):
         if name in self.analyses:
-            self.analyses[name].print_dc_voltages(self)
+            x = self.analyses[name].get_dc_solution()
+            for i in range(1, self.get_n()):
+                print('{}:\t{:0.4f} V'.format(self.node_name[i], x[i-1,0]))
+            print()
         else:
-            print('WARNING: unknown analysis name: {}'.format(name))
+            logger.warning('Unknown analysis name: {}!'.format(name))
     
     def print_dc_currents(self, name):
         if name in self.analyses:
-            self.analyses[name].print_dc_currents(self)
+            x = self.analyses[name].get_dc_solution()
+            n = self.get_n()
+            k = 0
+            print('DC Currents:')
+            for dev in self.devices:
+                if dev.get_vsource() == 1:
+                    print('{}:\t{:0.6f} A'.format(dev.name, x[n+k-1,0]))
+                elif dev.get_vsource() == 2:
+                    print('{}:\t{:0.6f} A (I1)'.format(dev.name, x[n+k-1,0]))
+                    print('{}:\t{:0.6f} A (I2)'.format(dev.name, x[n+k,0]))
+                k = k + dev.get_vsource()
+            print()
         else:
-            print('WARNING: unknown analysis name: {}'.format(name))
-
-    def run(self, name):
-        if name in self.analyses:
-            return self.analyses[name].run(self)
-        else:
-            print('WARNING: unknown analysis name: {}'.format(name))
-
-    def run_all(self):
-        for a in self.analyses.items():
-            a.run(self)
-
-    def is_linear(self):
-        for d in self.devices:
-            if d.is_linear() == False:
-                return False
-        return True
-
+            logger.warning('Unknown analysis name: {}!'.format(name))
 
 
 

@@ -49,39 +49,27 @@ class DC():
         self.name = name
         self.x = None
         
-        self.n = 0 # number of nodes in the circuit with 'gnd'
+        self.n = 0 # number of uniquely named nodes including 'gnd'
         self.m = 0 # number of independent voltage sources
-
-        self.lin_devs = list()    # list of linear devices
-        self.nonlin_devs = list() # list of nonlinear devices
-        
-        self.iidx = dict() # map a current idx in the MNA to a device
+        self.iidx = {} # maps a indep. vsource idx in the MNA to a device
+        self.lin_devs = []    # list of linear devices
+        self.nonlin_devs = [] # list of nonlinear devices
         
         self.options = options.copy() # DC simulation options
 
-    def run(self, circuit, v0=None):
+    def get_dc_solution(self):
+        return self.x
+
+    def run(self, y, x0=None):
         # Here we go!
         logger.info('Starting DC analysis.')
 
-        # clean-up
-        self.n = len(circuit.nodes)
-        self.m = 0
-        self.lin_devs.clear()
-        self.nonlin_devs.clear()
-        self.iidx.clear()
-
-        # map the number of extra rows required by each device
-        for dev in circuit.devices:
-            if dev.get_vsource() > 0:
-                self.iidx[dev] = self.n + self.m
-                self.m = self.m + dev.get_vsource()
-
-        # map all the linear and nonlinear devices
-        for dev in circuit.devices:
-            if dev.is_linear():
-                self.lin_devs.append(dev)
-            else:
-                self.nonlin_devs.append(dev)
+        # get netlist parameters and data structures
+        self.n = y.get_n()
+        self.m = y.get_m()
+        self.iidx = y.get_mna_extra_rows_dict()
+        self.lin_devs = y.get_linear_devices()
+        self.nonlin_devs = y.get_nonlinear_devices()
 
         # create MNA matrices for linear devices
         A = np.zeros((self.n+self.m, self.n+self.m))
@@ -287,24 +275,4 @@ class DC():
             k = k + 1
 
         return converged
-
-    def print_dc_voltages(self, c):
-        n = c.node_name
-        print('DC Voltages:')
-        for i in range(1, len(n)):
-            print('{}:\t{:0.4f} V'.format(n[i], self.x[i-1,0]))
-        print()
-
-    def print_dc_currents(self, c):
-        n = len(c.nodes)
-        m = 0
-        print('DC Currents:')
-        for dev in c.devices:
-            if dev.get_vsource() == 1:
-                print('{}:\t{:0.6f} A'.format(dev.name, self.x[n+m-1,0]))
-            elif dev.get_vsource() == 2:
-                print('{}:\t{:0.6f} A (I1)'.format(dev.name, self.x[n+m-1,0]))
-                print('{}:\t{:0.6f} A (I2)'.format(dev.name, self.x[n+m,0]))
-            m = m + dev.get_vsource()
-        print()
 
