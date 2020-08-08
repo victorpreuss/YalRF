@@ -40,7 +40,7 @@ class BJT():
         self.Vbeold = 0
         self.Vbcold = 0
 
-    def get_vsource(self):
+    def get_num_vsources(self, analysis):
         return 0
 
     def is_linear(self):

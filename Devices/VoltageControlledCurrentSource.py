@@ -9,7 +9,7 @@ class VoltageControlledCurrentSource():
         self.G     = G
         self.tau   = tau
 
-    def get_vsource(self):
+    def get_num_vsources(self, analysis):
         return 0
 
     def is_linear(self):

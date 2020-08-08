@@ -26,6 +26,9 @@ class Yarf():
         # dictionary of analysis to run in the circuit
         self.analyses = {} 
 
+    def get_devices(self):
+        return self.devices
+
     def get_device(self, name):
         for dev in self.devices:
             if dev.name == name:
@@ -39,9 +42,9 @@ class Yarf():
             logger.warning('Unknown analysis name: {}!'.format(name))
             return None
 
-    def add_ac_analysis(self, name, start, stop, numpoints=10, sweeptype='linear', stepsize=None):
+    def add_ac_analysis(self, name, start, stop, numpts=10, stepsize=None, sweeptype='linear'):
         if name not in self.analyses:
-            self.analyses[name] = AC(name, start, stop, numpoints, sweeptype, stepsize)
+            self.analyses[name] = AC(name, start, stop, numpts, stepsize, sweeptype)
             return self.analyses[name]
         else:
             logger.warning('Analysis name \'{}\' already taken!'.format(name))
@@ -55,9 +58,9 @@ class Yarf():
             logger.warning('Analysis name \'{}\' already taken!'.format(name))
             return None
 
-    def run(self, name):
+    def run(self, name, x0=None):
         if name in self.analyses:
-            return self.analyses[name].run(self)
+            return self.analyses[name].run(self, x0)
         else:
             logger.warning('Unknown analysis name: {}!'.format(name))
             return None
@@ -92,7 +95,7 @@ class Yarf():
         self.devices.append(ind)
         return ind
 
-    def add_vdc(self, name, n1, n2, dc):
+    def add_vdc(self, name, n1, n2, dc=0):
         n1 = self.add_node(n1)
         n2 = self.add_node(n2)
         
@@ -100,7 +103,7 @@ class Yarf():
         self.devices.append(vdc)
         return vdc
 
-    def add_idc(self, name, n1, n2, dc):
+    def add_idc(self, name, n1, n2, dc=0):
         n1 = self.add_node(n1)
         n2 = self.add_node(n2)
         
@@ -108,7 +111,7 @@ class Yarf():
         self.devices.append(idc)
         return idc
 
-    def add_vsource(self, name, n1, n2, vtype=None, dc=None, ac=None, phase=None):
+    def add_vsource(self, name, n1, n2, vtype=None, dc=0, ac=0, phase=0):
         n1 = self.add_node(n1)
         n2 = self.add_node(n2)
         
@@ -116,11 +119,11 @@ class Yarf():
         self.devices.append(vsource)
         return vsource
 
-    def add_isource(self, name, n1, n2, itype=None, dc=None, mag=None, phase=None):
+    def add_isource(self, name, n1, n2, itype=None, dc=0, ac=0, phase=0):
         n1 = self.add_node(n1)
         n2 = self.add_node(n2)
         
-        isource = CurrentSource(name, n1, n2, itype, dc, mag, phase)
+        isource = CurrentSource(name, n1, n2, itype, dc, ac, phase)
         self.devices.append(isource)
         return isource
 
@@ -186,10 +189,10 @@ class Yarf():
         return len(self.node_name)
 
     # returns the number of independent voltages
-    def get_m(self):
+    def get_m(self, analysis):
         m = 0
         for dev in self.devices:
-            m = m + dev.get_vsource()
+            m = m + dev.get_num_vsources(analysis)
         return m
 
     # given a node name, returns its index in the netlist
@@ -230,14 +233,14 @@ class Yarf():
         return True
     
     # return a dict which maps indep vsource idx in the MNA to a device
-    def get_mna_extra_rows_dict(self):
+    def get_mna_extra_rows_dict(self, analysis):
         n = self.get_n()
         k = 0
         iidx = {}
         for dev in self.devices:
-            if dev.get_vsource() > 0:
+            if dev.get_num_vsources(analysis) > 0:
                 iidx[dev] = n + k
-                k = k + dev.get_vsource()
+                k = k + dev.get_num_vsources(analysis)
         return iidx
 
     def print_dc_voltages(self, name):
@@ -256,12 +259,12 @@ class Yarf():
             k = 0
             print('DC Currents:')
             for dev in self.devices:
-                if dev.get_vsource() == 1:
+                if dev.get_num_vsources('dc') == 1:
                     print('{}:\t{:0.6f} A'.format(dev.name, x[n+k-1,0]))
-                elif dev.get_vsource() == 2:
+                elif dev.get_num_vsources('dc') == 2:
                     print('{}:\t{:0.6f} A (I1)'.format(dev.name, x[n+k-1,0]))
                     print('{}:\t{:0.6f} A (I2)'.format(dev.name, x[n+k,0]))
-                k = k + dev.get_vsource()
+                k = k + dev.get_num_vsources('dc')
             print()
         else:
             logger.warning('Unknown analysis name: {}!'.format(name))

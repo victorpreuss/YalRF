@@ -6,7 +6,7 @@ class Resistor():
         self.n2   = n2
         self.R    = float(value)
 
-    def get_vsource(self):
+    def get_num_vsources(self, analysis):
         return 0
 
     def is_linear(self):

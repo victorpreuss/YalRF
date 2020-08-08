@@ -1,3 +1,5 @@
+import numpy as np
+
 class Inductor():
     
     def __init__(self, name, n1, n2, value):
@@ -6,8 +8,11 @@ class Inductor():
         self.n2   = n2
         self.L    = float(value)
 
-    def get_vsource(self):
-        return 1
+    def get_num_vsources(self, analysis):
+        if analysis == 'dc':
+            return 1
+        elif analysis == 'ac':
+            return 0
 
     def is_linear(self):
         return True

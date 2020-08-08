@@ -66,10 +66,10 @@ class DC():
 
         # get netlist parameters and data structures
         self.n = y.get_n()
-        self.m = y.get_m()
-        self.iidx = y.get_mna_extra_rows_dict()
+        self.m = y.get_m('dc')
         self.lin_devs = y.get_linear_devices()
         self.nonlin_devs = y.get_nonlinear_devices()
+        self.iidx = y.get_mna_extra_rows_dict('dc')
 
         # create MNA matrices for linear devices
         A = np.zeros((self.n+self.m, self.n+self.m))
@@ -88,8 +88,8 @@ class DC():
         #       meanwhile: add gmin to all nodes :-)
         A = A + np.eye(len(A)) * self.options['gmin']
 
-        # create initial condition vector (TODO: nodeset)
-        x0 = np.zeros((len(A)-1, 1))
+        # create initial guess vector (TODO: nodeset)
+        x0 = np.zeros((len(A)-1, 1)) if x0 is None else x0
 
         if self.nonlin_devs == []:
             logger.info('Starting linear DC solver ...')

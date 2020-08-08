@@ -19,7 +19,7 @@ class Diode():
         # useful for limiting scheme
         self.Vdold = 0
 
-    def get_vsource(self):
+    def get_num_vsources(self, analysis):
         return 0
 
     def is_linear(self):

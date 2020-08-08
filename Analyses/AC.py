@@ -5,6 +5,7 @@ import scipy.sparse
 import scipy.sparse.linalg
 
 from yarf.Devices import *
+from yarf.Analyses import DC
 
 import logging
 
@@ -34,23 +35,22 @@ options['iabstol'] = 1e-12
 
 class AC():
     
-    def __init__(self, name, start, stop, numpoints=10, stepsize=None, sweeptype='linear'):
+    def __init__(self, name, start, stop, numpts=10, stepsize=None, sweeptype='linear'):
         self.name = name
 
-        self.xac = None # matrix of complex solutions (each frequency is a column)
+        self.xac = [] # list of complex solutions
         self.xdc = None
 
         self.start = start
         self.stop = stop
-        self.numpoints = numpoints
+        self.numpts = numpts
         self.stepsize = stepsize
         self.sweeptype = sweeptype
         
         self.n = 0 # number of nodes in the circuit with 'gnd'
         self.m = 0 # number of independent voltage sources
-        self.iidx = {} # map a indep. vsource idx in the MNA to a device
-        self.lin_devs = []    # list of linear devices
-        self.nonlin_devs = [] # list of nonlinear devices
+        self.devs = [] # list of devices in the circuit
+        self.iidx = {} # map indep. vsource idx in the MNA to a device
         
         self.options = options.copy() # DC simulation options
 
@@ -58,9 +58,9 @@ class AC():
             if stepsize is not None:
                 self.freqs = np.arange(start, stop, step)
             else:
-                self.freqs = np.linspace(start, stop, numpoints)
+                self.freqs = np.linspace(start, stop, numpts)
         elif sweeptype == 'logarithm':
-            self.freqs = np.logspace(start, stop, numpoints)
+            self.freqs = np.logspace(start, stop, numpts)
         else:
             logger.warning('Failed to calculate the frequencies vector!')
             self.freqs = np.array([start, stop])
@@ -68,53 +68,72 @@ class AC():
     def get_dc_solution(self):
         return self.xdc
 
+    def get_ac_solution(self):
+        return self.xac
+
+    def get_freqs(self):
+        return self.freqs
+
     def run(self, y, x0=None):
         # Here we go!
         logger.info('Starting AC analysis.')
 
         # get netlist parameters and data structures
         self.n = y.get_n()
-        self.m = y.get_m()
-        self.iidx = y.get_mna_extra_rows_dict()
-        self.lin_devs = y.get_linear_devices()
-        self.nonlin_devs = y.get_nonlinear_devices()
+        self.m = y.get_m('ac')
+        self.devs = y.get_devices()
+        self.iidx = y.get_mna_extra_rows_dict('ac')
 
         # create MNA matrices for linear devices
-        A = np.zeros((self.n+self.m, self.n+self.m))
-        z = np.zeros((self.n+self.m, 1))
+        A = np.zeros((self.n+self.m, self.n+self.m), dtype=complex)
+        z = np.zeros((self.n+self.m, 1), dtype=complex)
 
-        # populate the matrices A and z with the linear devices stamps
-        for dev in self.lin_devs:
-            idx = self.iidx[dev] if dev in self.iidx else None
-            dev.add_dc_stamps(A, z, None, idx)
+        # need to map the dc solution to the ac vector
+        # because the inductor has different number of
+        # rows for AC and DC simulations (or maybe not!)
+        if x0 is None:
+            dc = DC(self.name + 'DC')
+            self.xdc = dc.run(y)
+        else:
+            self.xdc = x0
 
-        # TODO: add gmin at the floating nodes such as middle of two
-        #       capacitors or nodes with only one device attached,
-        #       otherwise the matrix problem may become singular.
-        #       also need to do some sanity checks in the netlist
-        #       perhaps using some graph connectivity algorithm.
-        #       meanwhile: add gmin to all nodes :-)
-        A = A + np.eye(len(A)) * self.options['gmin']
+        self.xac.clear()
+        for freq in self.freqs:
+            # refresh the MNA matrices
+            A[:][:] = 0
+            z[:] = 0
 
-        # create initial condition vector (TODO: nodeset)
-        x0 = np.zeros((len(A)-1, 1))
+            # populate the matrices A and z with the devices stamps
+            for dev in self.devs:
+                idx = self.iidx[dev] if dev in self.iidx else None
+                dev.add_ac_stamps(A, z, self.xdc, idx, freq)
 
-        if self.nonlin_devs == []:
-            logger.info('Starting linear DC solver ...')
-            issolved = self.solve_dc_linear(A, z)
-            if issolved:
-                return self.x
+            # adding gmin to all nodes
+            A = A + np.eye(len(A)) * self.options['gmin']
+
+            # solve complex linear system
+            xac, issolved = self.solve_ac_linear(A, z)
+
+            # if the system is solved, add the solution to output,
+            # otherwise add zeroes as solution and issue error
+            if issolved:    
+                self.xac.append(xac)
+            else:
+                self.xac.append(np.zeros((len(A)-1,1)))
+                logger.error('Failed to solve AC for frequency {}!', freq)
+
+        return self.xac
 
     def solve_ac_linear(self, A, z):
         if self.options['is_sparse'] == True:
             An = scipy.sparse.csc_matrix(A[1:,1:])
             lu = scipy.sparse.linalg.splu(An)
-            self.x = lu.solve(z[1:])
+            xac = lu.solve(z[1:])
         else:
             lu, piv = scipy.linalg.lu_factor(A[1:,1:])
-            self.x = scipy.linalg.lu_solve((lu, piv), z[1:])
+            xac = scipy.linalg.lu_solve((lu, piv), z[1:])
 
-        return not np.isnan(np.sum(self.x))
+        return xac, not np.isnan(np.sum(xac))
 
     def solve_dc_nonlinear(self, A, z, x0):
         # get the configuration parameters
