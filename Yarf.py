@@ -35,6 +35,9 @@ class Yarf():
                 return dev
         return None
 
+    def get_v_idx(self, name):
+        return (self.node_idx[name] - 1)
+
     def get_analysis(self, name):
         if name in self.analyses:
             return self.analyses[name]

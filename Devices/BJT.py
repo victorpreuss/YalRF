@@ -6,7 +6,7 @@ import numpy as np
 
 # BJT Spice Gummel-Poon model options
 options = dict()
-options['Temp'] = 300.0 # model temperature
+options['Temp'] = 300.0 # device temperature
 options['Is']  = 1e-15  # saturation current
 options['Nf']  = 1.0    # forward emission coefficient
 options['Nr']  = 1.0    # reverse emission coefficient

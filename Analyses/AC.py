@@ -60,7 +60,7 @@ class AC():
             else:
                 self.freqs = np.linspace(start, stop, numpts)
         elif sweeptype == 'logarithm':
-            self.freqs = np.logspace(start, stop, numpts)
+            self.freqs = np.geomspace(start, stop, numpts)
         else:
             logger.warning('Failed to calculate the frequencies vector!')
             self.freqs = np.array([start, stop])
@@ -135,6 +135,7 @@ class AC():
 
         return xac, not np.isnan(np.sum(xac))
 
+    # TODO: remove this section, get only the convergence criteria
     def solve_dc_nonlinear(self, A, z, x0):
         # get the configuration parameters
         reltol = self.options['reltol']
