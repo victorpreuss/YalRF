@@ -12,8 +12,11 @@ class CurrentControlledVoltageSource():
     def get_num_vsources(self, analysis):
         return 2
 
-    def is_linear(self):
-        return True
+    def is_nonlinear(self):
+        return False
+
+    def init(self):
+        pass
 
     def add_dc_stamps(self, A, z, x, iidx):
         A[iidx][self.n2] = +1.0

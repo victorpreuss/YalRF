@@ -14,8 +14,11 @@ class VoltageSource():
     def get_num_vsources(self, analysis):
         return 1
 
-    def is_linear(self):
-        return True
+    def is_nonlinear(self):
+        return False
+
+    def init(self):
+        pass
 
     def add_dc_stamps(self, A, z, x, iidx):
         A[self.n1][iidx] = +1.0 

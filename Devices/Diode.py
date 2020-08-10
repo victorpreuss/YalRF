@@ -1,7 +1,7 @@
 from scipy.constants import k, e
 import numpy as np
 
-# diode model options
+# Diode model options
 options = {}
 options['Temp'] = 300.0  # device temperature
 options['Is']  = 1e-15   # saturation current
@@ -34,7 +34,11 @@ options['Tm2'] = 0.0     # M quadratic temperature coefficient
 options['Tnom'] = 300.0  # temperature at which parameters were extracted
 options['Area'] = 1.0    # diode area multiplier
 
-# TODO: implement reverse breakdown, temperature dependence and area dependence
+# TODO: reverse breakdown
+#       temperature dependence
+#       area dependence
+#       series resistance (Rs)
+#       noise
 class Diode():
     
     def __init__(self, name, n1, n2):
@@ -43,6 +47,11 @@ class Diode():
         self.n2   = n2 # cathode (-)
 
         self.options = options.copy() # diode options
+        self.oppoint = {}
+
+        # this options vector holds the corrected values
+        # for the diode according to area and temperature
+        self.adjusted_options = options.copy()
 
         # for the limiting scheme
         self.Vdold = 0.
@@ -50,19 +59,19 @@ class Diode():
     def get_num_vsources(self, analysis):
         return 0
 
-    def is_linear(self):
-        return False
+    def is_nonlinear(self):
+        return True
+
+    def init(self):
+        pass
 
     def add_dc_stamps(self, A, z, x, iidx):
-        T = self.options['Temp']
-        Vt = k * T / e
+        # calculate dc parameters
+        self.calc_dc(x)
 
-        V1 = x[self.n1-1] if self.n1 != 0 else 0.
-        V2 = x[self.n2-1] if self.n2 != 0 else 0.
-        Vd = V1 - V2
-
-        Vd = self.limit_diode_voltage(Vd, Vt)
-        gd, Id = self.get_gd_and_Id(Vd, Vt)
+        Vd = self.oppoint['Vd']
+        Id = self.oppoint['Id']
+        gd = self.oppoint['gd']
         I = Id - gd * Vd
 
         A[self.n1][self.n1] = A[self.n1][self.n1] + gd
@@ -73,59 +82,61 @@ class Diode():
         z[self.n2] = z[self.n2] + I
 
     def add_ac_stamps(self, A, z, x, iidx, freq):
-        Cj0 = self.options['Cj0']
-        M = self.options['M']
-        Vj = self.options['Vj']
-        Fc = self.options['Fc']
-        Cp = self.options['Cp']
-        Tt = self.options['Tt']
-        T = self.options['Temp']
-        Vt = k * T / e
-
-        V1 = x[self.n1-1] if self.n1 != 0 else 0.
-        V2 = x[self.n2-1] if self.n2 != 0 else 0.
-        Vd = V1 - V2
-
-        Vd = self.limit_diode_voltage(Vd, Vt)
-        gd, Id = self.get_gd_and_Id(Vd, Vt)
-
-        if Vd / Vj <= Fc:
-            Cj = Cj0 * np.power((1. - Vd / Vj), -M)
-            Qj = Cj0 * Vj / (1. - M) * (1. - np.power((1. - Vd / Vj), (1. - M)))
-        else:
-            Cj = Cj0 / np.power((1. - Fc), M) * (1. + M * (Vd / Vj - Fc) / (1. - Fc))
-            Xd = (1. - np.power((1. - Fc), (1. - M))) / (1. - M) + \
-                 (1. - Fc * (1. + M)) / np.power((1. - Fc), (1. + M)) * (Vd / Vj - Fc) + \
-                 M / (2. * np.power((1. - Fc), (1. + M))) * (np.square(Vd / Vj) - np.square(Fc))
-            Qj = Cj0 * Vj * Xd
-        
-        Cd = Cp + Tt * gd + Cj
-        Qd = Cp * Vd + Tt * Id + Qj
+        gd = self.oppoint['gd']
+        Cd = self.oppoint['Cd']
         y = gd + 1j * 2. * np.pi * freq * Cd
-        
-        # print('np.pi = {}\nfreq = {}\n'.format(np.pi, freq))
-        # print('Vd = {}\nId = {}\ngd = {}\nCd = {}\ny = {}\n'.format(Vd, Id, gd, Cd, y))
 
         A[self.n1][self.n1] = A[self.n1][self.n1] + y
         A[self.n2][self.n2] = A[self.n2][self.n2] + y
         A[self.n1][self.n2] = A[self.n1][self.n2] - y
         A[self.n2][self.n1] = A[self.n2][self.n1] - y
 
-    def limit_diode_voltage(self, Vd, Vt):
-        Is = self.options['Is']
-        N = self.options['N']
-        Vcrit = N * Vt * np.log(N * Vt / (np.sqrt(2.) * Is))
-        if (Vd > 0. and Vd > Vcrit):
-            Vd = self.Vdold + N * Vt * np.log1p((Vd - self.Vdold) / (N * Vt))
-        self.Vdold = Vd
-        return Vd
+    def calc_oppoint(self, x):
+        self.init()
+        self.calc_dc(x)
 
-    def get_gd_and_Id(self, Vd, Vt):
+        Cj0 = self.options['Cj0']
+        M = self.options['M']
+        Vj = self.options['Vj']
+        Fc = self.options['Fc']
+        Cp = self.options['Cp']
+        Tt = self.options['Tt']
+        Vd = self.oppoint['Vd']
+        gd = self.oppoint['gd']
+
+        if Vd / Vj <= Fc:
+            Cj = Cj0 * np.power((1. - Vd / Vj), -M)
+        else:
+            Cj = Cj0 / np.power((1. - Fc), M) * (1. + M * (Vd / Vj - Fc) / (1. - Fc))
+
+        Cd = Cp + Tt * gd + Cj
+
+        self.oppoint['Cd'] = Cd
+        self.oppoint['Cj'] = Cj
+        self.oppoint['Cdiff'] = Tt * gd
+
+        # if Vd / Vj <= Fc:
+        #     Qj = Cj0 * Vj / (1. - M) * (1. - np.power((1. - Vd / Vj), (1. - M)))
+        # else:
+        #     Xd = (1. - np.power((1. - Fc), (1. - M))) / (1. - M) + \
+        #          (1. - Fc * (1. + M)) / np.power((1. - Fc), (1. + M)) * (Vd / Vj - Fc) + \
+        #          M / (2. * np.power((1. - Fc), (1. + M))) * (np.square(Vd / Vj) - np.square(Fc))
+        #     Qj = Cj0 * Vj * Xd
+        # Qd = Cp * Vd + Tt * Id + Qj
+
+    def calc_dc(self, x):
         Is = self.options['Is']
         N = self.options['N']
         Isr = self.options['Isr']
         Nr = self.options['Nr']
         Ikf = self.options['Ikf']
+        T = self.options['Temp']
+        Vt = k * T / e
+
+        V1 = x[self.n1-1] if self.n1 > 0 else 0.
+        V2 = x[self.n2-1] if self.n2 > 0 else 0.
+        Vd = V1 - V2
+        Vd = self.limit_diode_voltage(Vd, Vt)
 
         # forward current
         Idf = Is * np.expm1(Vd / (N * Vt))
@@ -144,7 +155,25 @@ class Diode():
         Id = Idf + Idr
         gd = gdf + gdr
 
-        return gd, Id
+        self.oppoint['Vd'] = Vd
+        self.oppoint['Id'] = Id
+        self.oppoint['gd'] = gd
+        self.oppoint['Idf'] = Idf
+        self.oppoint['gdf'] = gdf
+        self.oppoint['Idr'] = Idr
+        self.oppoint['gdr'] = gdr
+
+    def limit_diode_voltage(self, Vd, Vt):
+        Is = self.options['Is']
+        N = self.options['N']
+
+        # limiting algorithm to avoid overflow
+        Vcrit = N * Vt * np.log(N * Vt / (np.sqrt(2.) * Is))
+        if (Vd > 0. and Vd > Vcrit):
+            Vd = self.Vdold + N * Vt * np.log1p((Vd - self.Vdold) / (N * Vt))
+        self.Vdold = Vd
+
+        return Vd
 
     # a simple exponential diode, used for experiments :-)
     def get_gd_and_Id_shockley(self, A, z, x, iidx):

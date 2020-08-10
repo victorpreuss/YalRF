@@ -38,7 +38,7 @@ class AC():
     def __init__(self, name, start, stop, numpts=10, stepsize=None, sweeptype='linear'):
         self.name = name
 
-        self.xac = [] # list of complex solutions
+        self.xac = None # list of complex solutions
         self.xdc = None
 
         self.start = start
@@ -75,29 +75,35 @@ class AC():
         return self.freqs
 
     def run(self, y, x0=None):
-        # Here we go!
-        logger.info('Starting AC analysis.')
-
         # get netlist parameters and data structures
         self.n = y.get_n()
         self.m = y.get_m('ac')
         self.devs = y.get_devices()
         self.iidx = y.get_mna_extra_rows_dict('ac')
 
-        # create MNA matrices for linear devices
-        A = np.zeros((self.n+self.m, self.n+self.m), dtype=complex)
-        z = np.zeros((self.n+self.m, 1), dtype=complex)
-
-        # need to map the dc solution to the ac vector
-        # because the inductor has different number of
-        # rows for AC and DC simulations (or maybe not!)
+        # perform DC simulation if no operating point is provided
         if x0 is None:
             dc = DC(self.name + 'DC')
             self.xdc = dc.run(y)
         else:
             self.xdc = x0
 
-        self.xac.clear()
+        # calculate the operating point of nonlinear devices
+        for dev in self.devs:
+            if dev.is_nonlinear():
+                dev.calc_oppoint(self.xdc)
+
+        # Here we go!
+        logger.info('Starting AC analysis.')
+
+        # create MNA matrices
+        A = np.zeros((self.n+self.m, self.n+self.m), dtype=complex)
+        z = np.zeros((self.n+self.m, 1), dtype=complex)
+
+        # crea AC solution complex empty matrix
+        self.xac = np.empty((len(self.freqs), len(z)-1), dtype=complex)
+
+        k = 0
         for freq in self.freqs:
             # refresh the MNA matrices
             A[:][:] = 0
@@ -116,12 +122,14 @@ class AC():
 
             # if the system is solved, add the solution to output,
             # otherwise add zeroes as solution and issue error
-            if issolved:    
-                self.xac.append(xac)
+            if issolved:
+                self.xac[k] = np.transpose(xac)
             else:
-                self.xac.append(np.zeros((len(A)-1,1)))
+                self.xac[k] = np.zeros((1, len(z)-1))
                 logger.error('Failed to solve AC for frequency {}!', freq)
+            k = k + 1
 
+        logger.info('Finished AC analysis.')
         return self.xac
 
     def solve_ac_linear(self, A, z):
@@ -135,66 +143,5 @@ class AC():
 
         return xac, not np.isnan(np.sum(xac))
 
-    # TODO: remove this section, get only the convergence criteria
-    def solve_dc_nonlinear(self, A, z, x0):
-        # get the configuration parameters
-        reltol = self.options['reltol']
-        vabstol = self.options['vabstol']
-        iabstol = self.options['iabstol']
-        maxiter = self.options['max_iterations']
-
-        xk = x0.copy()
-        Anl = np.zeros(A.shape)
-        znl = np.zeros(z.shape)
-        converged = False
-        k = 0
-        while (not converged) and (k < maxiter):
-            # refresh nonlinear MNA matrices
-            Anl[:,:] = 0.0
-            znl[:] = 0.0
-
-            # add nonlinear devices to the MNA system
-            for dev in self.nonlin_devs:
-                idx = self.iidx[dev] if dev in self.iidx else None
-                dev.add_dc_stamps(Anl, znl, xk, idx)
-
-            # index slicing is used to remove the 'gnd' node
-            # Anl and znl add the nonlinear element stamps
-            An = A[1:,1:] + Anl[1:,1:]
-            zn = z[1:] + znl[1:]
-
-            # TODO: use sparse methods if 'is_sparse' is set
-            #       add exception handling here (?)
-            lu, piv = scipy.linalg.lu_factor(An)
-            self.x  = scipy.linalg.lu_solve((lu, piv), zn)
-
-            if np.isnan(np.sum(self.x)):
-                logger.debug('Failed to resolve linear system! Solution has NaN ...') # why?
-                return False
-
-            dx = self.x - xk
-
-            # check if voltages converged
-            vconverged = True
-            for i in range(0, self.n-1):
-                if np.abs(dx[i,0]) > reltol * np.abs(xk[i,0]) + vabstol:
-                    vconverged = False
-            
-            # check if currents converged
-            iconverged = True
-            for i in range(self.n, len(dx)):
-                if np.abs(dx[i,0]) > reltol * np.abs(xk[i,0]) + iabstol:
-                    iconverged = False
-
-            if vconverged and iconverged:
-                converged = True
-            else:
-                xk = self.x
-                k = k + 1
-
-            logger.debug('A:\n{}\nAnl:\n{}\nz:\n{}\nznl\n{}'.format(A, Anl[1:,1:], z, znl[1:]))
-            logger.debug('xk:\n{}\nx:\n{}'.format(xk, self.x))
-
-        return converged
 
 

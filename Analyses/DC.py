@@ -75,6 +75,10 @@ class DC():
         A = np.zeros((self.n+self.m, self.n+self.m))
         z = np.zeros((self.n+self.m, 1))
 
+        # some devices have initialization routines
+        for dev in y.get_devices():
+            dev.init()
+
         # populate the matrices A and z with the linear devices stamps
         for dev in self.lin_devs:
             idx = self.iidx[dev] if dev in self.iidx else None

@@ -26,9 +26,6 @@ class Yarf():
         # dictionary of analysis to run in the circuit
         self.analyses = {} 
 
-    def get_devices(self):
-        return self.devices
-
     def get_device(self, name):
         for dev in self.devices:
             if dev.name == name:
@@ -212,11 +209,15 @@ class Yarf():
         else:
             return None
 
+    # get a list of the devices in the netlist
+    def get_devices(self):
+        return self.devices
+
     # return a list of the linear devices in the netlist
     def get_linear_devices(self):
         lin_devs = []
         for dev in self.devices:
-            if dev.is_linear():
+            if not dev.is_nonlinear():
                 lin_devs.append(dev)
         return lin_devs
 
@@ -224,15 +225,15 @@ class Yarf():
     def get_nonlinear_devices(self):
         nonlin_devs = []
         for dev in self.devices:
-            if not dev.is_linear():
+            if dev.is_nonlinear():
                 nonlin_devs.append(dev)
         return nonlin_devs
 
-    # return True if netlist is purely linear
-    def is_linear(self):
+    # return True if netlist has nonlinear device
+    def is_nonlinear(self):
         for dev in self.devices:
-            if dev.is_linear() == False:
-                return False
+            if dev.is_nonlinear():
+                return True
         return True
     
     # return a dict which maps indep vsource idx in the MNA to a device
