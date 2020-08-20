@@ -175,7 +175,7 @@ class Diode():
 
         return Vd
 
-    # a simple exponential diode, used for experiments :-)
+    # Legacy: a simple exponential diode, used for initial experiments :-)
     def get_gd_and_Id_shockley(self, A, z, x, iidx):
         Is = self.options['Is']
         N  = self.options['N']

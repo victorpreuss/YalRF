@@ -7,10 +7,10 @@ options['Temp'] = 300.0 # device temperature
 options['Is']  = 1e-15  # saturation current
 options['Nf']  = 1.0    # forward emission coefficient
 options['Nr']  = 1.0    # reverse emission coefficient
-options['Ikf'] = 1e12   # high current corner for forward beta
-options['Ikr'] = 1e12   # high current corner for reverse beta
-options['Vaf'] = 1e15   # forward Early Voltage
-options['Var'] = 1e15   # reverse Early Voltage
+options['Ikf'] = 1e9    # high current corner for forward beta
+options['Ikr'] = 1e9    # high current corner for reverse beta
+options['Vaf'] = 1e12   # forward Early Voltage
+options['Var'] = 1e12   # reverse Early Voltage
 options['Ise'] = 0.0    # base-emitter leakage saturation current
 options['Ne']  = 1.5    # base-emitter leakage emission coefficient
 options['Isc'] = 0.0    # base-collector leakage saturation current
@@ -18,7 +18,7 @@ options['Nc']  = 2.0    # base-collector leakage emission coefficient
 options['Bf']  = 100.0  # forward beta
 options['Br']  = 1.0    # reverse beta
 options['Rbm'] = 0.0    # minimum base resistance for high-currents
-options['Irb'] = 1e12   # current for base resistance midpoint
+options['Irb'] = 1e9    # current for base resistance midpoint
 options['Rc']  = 0.0    # collector ohmic resistance
 options['Re']  = 0.0    # emitter ohmic resistance
 options['Rb']  = 0.0    # zero-bias base resistance
@@ -35,7 +35,7 @@ options['Mjs'] = 0.0    # substrate junction exponential factor
 options['Fc']  = 0.5    # forward-bias depletion capacitance coefficient
 options['Tf']  = 0.0    # ideal forward transit time
 options['Xtf'] = 0.0    # coefficient of bias-dependence for Tf
-options['Vtf'] = 1e15   # coefficient of base-collector voltage dependence for Tf
+options['Vtf'] = 1e12   # coefficient of base-collector voltage dependence for Tf
 options['Itf'] = 0.0    # high-current effect on Tf
 options['Ptf'] = 0.0    # excess phase at frequency 1 / (2 pi Tf)
 options['Tr']  = 0.0    # ideal reverse transit time
@@ -53,7 +53,7 @@ options['Area'] = 1.0   # bjt area multiplier
 
 # TODO: base resistance (bias dependent)
 #       DC resistances Rb, Rc and Re
-#       excess phase
+#       excess phase (for transient?)
 #       temperature dependence
 #       area dependence
 #       Cbcxdep is currently unused

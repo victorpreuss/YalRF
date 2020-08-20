@@ -14,8 +14,8 @@ logger.setLevel(logging.INFO)
 
 formatter = logging.Formatter('[%(levelname)s]: %(name)s: %(message)s')
 
-file_handler = logging.FileHandler('AC.log')
-file_handler.setFormatter(formatter)
+# file_handler = logging.FileHandler('AC.log')
+# file_handler.setFormatter(formatter)
 
 stream_handler = logging.StreamHandler()
 stream_handler.setFormatter(formatter)
@@ -47,12 +47,12 @@ class AC():
         self.stepsize = stepsize
         self.sweeptype = sweeptype
         
-        self.n = 0 # number of nodes in the circuit with 'gnd'
-        self.m = 0 # number of independent voltage sources
-        self.devs = [] # list of devices in the circuit
-        self.iidx = {} # map indep. vsource idx in the MNA to a device
+        self.n = 0     # number of uniquely named nodes including 'gnd'
+        self.m = 0     # number of independent voltage sources
+        self.devs = [] # list of devices
+        self.iidx = {} # maps a indep. vsource idx in the MNA to a device
         
-        self.options = options.copy() # DC simulation options
+        self.options = options.copy() # AC simulation options
 
         if sweeptype == 'linear':
             if stepsize is not None:
@@ -100,7 +100,7 @@ class AC():
         A = np.zeros((self.n+self.m, self.n+self.m), dtype=complex)
         z = np.zeros((self.n+self.m, 1), dtype=complex)
 
-        # crea AC solution complex empty matrix
+        # create complex matrix to hold the AC solution
         self.xac = np.empty((len(self.freqs), len(z)-1), dtype=complex)
 
         k = 0
@@ -120,13 +120,15 @@ class AC():
             # solve complex linear system
             xac, issolved = self.solve_ac_linear(A, z)
 
-            # if the system is solved, add the solution to output,
-            # otherwise add zeroes as solution and issue error
+            # linear system is solved: add the solution to output
+            # otherwise: add zeroes as solution and issue error log
             if issolved:
                 self.xac[k] = np.transpose(xac)
             else:
                 self.xac[k] = np.zeros((1, len(z)-1))
                 logger.error('Failed to solve AC for frequency {}!', freq)
+
+            logger.debug('A:\n{}\nz:\n{}\nxac\n{}'.format(A[1:,1:], z[1:], xac))
             k = k + 1
 
         logger.info('Finished AC analysis.')

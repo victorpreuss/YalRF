@@ -13,8 +13,8 @@ logger.setLevel(logging.INFO)
 
 formatter = logging.Formatter('[%(levelname)s]: %(name)s: %(message)s')
 
-file_handler = logging.FileHandler('DC.log')
-file_handler.setFormatter(formatter)
+# file_handler = logging.FileHandler('DC.log')
+# file_handler.setFormatter(formatter)
 
 stream_handler = logging.StreamHandler()
 stream_handler.setFormatter(formatter)
@@ -49,9 +49,9 @@ class DC():
         self.name = name
         self.x = None
         
-        self.n = 0 # number of uniquely named nodes including 'gnd'
-        self.m = 0 # number of independent voltage sources
-        self.iidx = {} # maps a indep. vsource idx in the MNA to a device
+        self.n = 0            # number of uniquely named nodes including 'gnd'
+        self.m = 0            # number of independent voltage sources
+        self.iidx = {}        # maps a indep. vsource idx in the MNA to a device
         self.lin_devs = []    # list of linear devices
         self.nonlin_devs = [] # list of nonlinear devices
         
@@ -165,7 +165,7 @@ class DC():
             self.x  = scipy.linalg.lu_solve((lu, piv), zn)
 
             if np.isnan(np.sum(self.x)):
-                logger.debug('Failed to resolve linear system! Solution has NaN ...') # why?
+                logger.debug('Failed to resolve linear system! Solution has NaN ...')
                 return False
 
             dx = self.x - xk
