@@ -1,6 +1,4 @@
-import sys
-sys.path.append("../yarf")
-
+import setup
 from yarf import Yarf
 
 y = Yarf("Hello World!")

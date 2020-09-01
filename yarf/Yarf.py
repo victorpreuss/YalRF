@@ -3,7 +3,8 @@ from .Analyses import *
 from .Utils import yarf_logger as logger
 
 class Yarf():
-    """Class containing the Yarf API for circuit simulation.
+    """
+    Class containing the Yarf API for circuit simulation.
     
     This class is initialized with only the circuit name. It contains methods to
     create and manipulate netlists, add analyses to be performed in the circuit,
@@ -11,12 +12,13 @@ class Yarf():
 
     """
     def __init__(self, name):
-        """ Class constructor.
+        """
+        Class constructor.
 
-        Creates an empty netlist with only the 'gnd' node included.
+        Creates an empty netlist with only the 'gnd' node.
 
         Parameters
-        ------------
+        ----------
         name : str
             Name of the circuit.
 
@@ -32,10 +34,11 @@ class Yarf():
         self.analyses = {}                  # list of analysis objects (DC, AC, Transient, ...)
 
     def add_ac_analysis(self, name, start, stop, numpts=10, stepsize=None, sweeptype='linear'):
-        """Create and add an AC analysis.
+        """
+        Create and add an AC analysis.
 
         Parameters
-        ------------
+        ----------
         name : str
             Name for the analysis object.
         start : float
@@ -50,9 +53,9 @@ class Yarf():
         sweeptype : str
             Type of sweep to be performed. Possible values are: linear, logarithm.
 
-        Return
-        --------
-        ac : :class:`AC`
+        Returns
+        -------
+        :class:`AC`
             Reference to the created AC object. This allows the user to change
             internal parameters of the instance before running it.
 
@@ -66,18 +69,19 @@ class Yarf():
             return None
 
     def add_dc_analysis(self, name, nodeset=None):
-        """Create and add a DC analysis.
+        """
+        Create and add a DC analysis.
 
         Parameters
-        ------------
+        ----------
         name : str
             Name for the analysis object.
         nodeset : dict
             Dictionary with node names and guesses for their initial condition.
 
-        Return
-        --------
-        dc : :class:`DC`
+        Returns
+        -------
+        :class:`DC`
             Reference to the created DC object. This allows the user to change
             internal parameters of the instance before running it.
 
@@ -91,21 +95,22 @@ class Yarf():
             return None
 
     def run(self, name, x0=None):
-        """Run analysis with the requested name using initial condition.
+        """
+        Run analysis with the requested name using initial condition.
 
         Parameters
-        ------------
+        ----------
         name : str
             Name for the analysis object to run.
         x0 : :class:`numpy.ndarray`
             DC solution to be used as initial condition or operating point for
             the analysis. Some analyses (such as DC) ignore this parameter.
 
-        Return
-        --------
-        sol : list or :class:`numpy.ndarray`
-            Analysis solution. Depending on the analysis (AC, DC, Transient, ...)
-            the solution might be stored differently.
+        Returns
+        -------
+        list or :class:`numpy.ndarray`
+            Solution data. Depending on the analysis (AC, DC, Transient, ...)
+            it might be stored in different data structures.
 
         """
         if name in self.analyses:
@@ -116,10 +121,11 @@ class Yarf():
             return None
 
     def add_resistor(self, name, n1, n2, value):
-        """Add resistor to the netlist.
+        """
+        Add resistor to the netlist.
 
         Parameters
-        ------------
+        ----------
         name : str
             Name of the device.
         n1 : str
@@ -129,8 +135,8 @@ class Yarf():
         value : float
             Resistance value in ohms.
 
-        Return
-        --------
+        Returns
+        -------
         res : :class:`Resistor`
             Reference to the created Resistor object.
 
@@ -143,10 +149,11 @@ class Yarf():
         return res
         
     def add_capacitor(self, name, n1, n2, value):
-        """Add capacitor to the netlist.
+        """
+        Add capacitor to the netlist.
 
         Parameters
-        ------------
+        ----------
         name : str
             Name of the device.
         n1 : str
@@ -156,9 +163,9 @@ class Yarf():
         value : float
             Capacitance value in Farads.
 
-        Return
-        --------
-        res : :class:`Capacitor`
+        Returns
+        -------
+        :class:`Capacitor`
             Reference to the created Capacitor object.
 
         """
@@ -170,10 +177,11 @@ class Yarf():
         return cap
         
     def add_inductor(self, name, n1, n2, value):
-        """Add inductor to the netlist.
+        """
+        Add inductor to the netlist.
 
         Parameters
-        ------------
+        ----------
         name : str
             Name of the device.
         n1 : str
@@ -183,9 +191,9 @@ class Yarf():
         value : float
             Inductance value in Henrys.
 
-        Return
-        --------
-        res : :class:`Inductor`
+        Returns
+        -------
+        :class:`Inductor`
             Reference to the created Inductor object.
 
         """
@@ -197,10 +205,11 @@ class Yarf():
         return ind
 
     def add_vdc(self, name, n1, n2, dc=0):
-        """Add DC voltage source to the netlist.
+        """
+        Add DC voltage source to the netlist.
 
         Parameters
-        ------------
+        ----------
         name : str
             Name of the device.
         n1 : str
@@ -210,9 +219,9 @@ class Yarf():
         dc : float
             DC voltage value in Volts.
 
-        Return
-        --------
-        res : :class:`VoltageSource`
+        Returns
+        -------
+        :class:`VoltageSource`
             Reference to the created VoltageSource object.
 
         """
@@ -224,10 +233,11 @@ class Yarf():
         return vdc
 
     def add_idc(self, name, n1, n2, dc=0):
-        """Add DC current source to the netlist.
+        """
+        Add DC current source to the netlist.
 
         Parameters
-        ------------
+        ----------
         name : str
             Name of the device.
         n1 : str
@@ -237,9 +247,9 @@ class Yarf():
         dc : float
             DC current value in Amperes.
 
-        Return
-        --------
-        res : :class:`CurrentSource`
+        Returns
+        -------
+        :class:`CurrentSource`
             Reference to the created CurrentSource object.
 
         """
@@ -333,20 +343,21 @@ class Yarf():
     # def remove_analysis(self, name):
 
     def add_node(self, n):
-        """Add node and returns its index in the netlist.
+        """
+        Add node and returns its index in the netlist.
 
         This method checks if a node name (str) already exists in the netlist.
         If it does, returns the previous index assigned for this node. Otherwise
         it adds the new node name to the netlist and assign an index to it.
 
         Parameters
-        ------------
+        ----------
         n : str
             Name of the node to have an index assigned.
 
-        Return
-        --------
-        idx : int
+        Returns
+        -------
+        int
             Index of the node in the netlist.
 
         """
@@ -356,18 +367,19 @@ class Yarf():
         return self.node_name_to_idx[n]
 
     def is_nonlinear(self):
-        """bool: Return True if netlist has a nonlinear device."""
+        """Return True if netlist has a nonlinear device."""
         for dev in self.devices:
             if dev.is_nonlinear():
                 return True
         return True
 
     def get_n(self):
-        """int: Return number of uniquely named nodes in the netlist."""
+        """Return number of uniquely named nodes in the netlist."""
         return len(self.node_idx_to_name)
 
     def get_m(self, analysis):
-        """Return number of independent voltage sources for an analysis.
+        """
+        Return number of independent voltage sources for an analysis.
 
         The number of independent voltage sources needed are important for
         the MNA algorithm, since it determines the number of additional rows
@@ -375,14 +387,14 @@ class Yarf():
         models used by each device for a determined analysis.
 
         Parameters
-        ------------
+        ----------
         analysis : str
-            Name of the analysis to get the voltage sources from.
+            Name of the analysis.
 
-        Return
-        --------
-        m : int
-            Number of independent voltage sources for an analysis.
+        Returns
+        -------
+        int
+            Number of independent voltage sources in an analysis.
 
         """
         m = 0
@@ -391,16 +403,17 @@ class Yarf():
         return m
 
     def get_analysis(self, name):
-        """Return a reference to an Analysis object with the requested name.
+        """
+        Return reference to an analysis object with the requested name.
 
         Parameters
-        ------------
+        ----------
         name : str
-            Name of the analysis to get the instance.
+            Name of the analysis to get instance.
 
-        Return
-        --------
-        a : :class:`Analyses`
+        Returns
+        -------
+        :class:`Analyses`
             Analysis with the requested name.
 
         """
@@ -412,16 +425,17 @@ class Yarf():
             return None
 
     def get_device(self, name):
-        """Return reference to a Device object with the requested name.
+        """
+        Return reference to a device object with the requested name.
 
         Parameters
-        ------------
+        ----------
         name : str
-            Name of the device to get the instance.
+            Name of the device to get instance.
 
-        Return
-        --------
-        dev : :class:`Devices`
+        Returns
+        -------
+        :class:`Devices`
             Device with the requested name.
 
         """
@@ -432,11 +446,11 @@ class Yarf():
         return None
 
     def get_devices(self):
-        """:obj:`list` of :obj:`Devices`: Return list of devices in the netlist."""
+        """Return list of devices in the netlist."""
         return self.devices
 
     def get_linear_devices(self):
-        """:obj:`list` of :obj:`Devices`: Return list of linear devices in the netlist."""
+        """Return list of linear devices in the netlist."""
         lin_devs = []
         for dev in self.devices:
             if not dev.is_nonlinear():
@@ -444,7 +458,7 @@ class Yarf():
         return lin_devs
 
     def get_nonlinear_devices(self):
-        """:obj:`list` of :obj:`Devices`: Return list of nonlinear devices in the netlist."""
+        """Return list of nonlinear devices in the netlist."""
         nonlin_devs = []
         for dev in self.devices:
             if dev.is_nonlinear():
@@ -452,16 +466,17 @@ class Yarf():
         return nonlin_devs
 
     def get_node_idx(self, name):
-        """Return a node index in the netlist from its name.
+        """
+        Return a node index in the netlist from its name.
 
         Parameters
-        ------------
+        ----------
         name : str
-            Name of the node to get the index.
+            Name of the node.
 
-        Return
-        --------
-        n : int
+        Returns
+        -------
+        int
             Node index.
 
         """
@@ -473,16 +488,17 @@ class Yarf():
             return None
 
     def get_node_name(self, idx):
-        """Return a node name from its index in the netlist.
+        """
+        Return a node name from its index in the netlist.
 
         Parameters
-        ------------
+        ----------
         idx : int
-            Name of the node to get the index.
+            Index of the node.
 
-        Return
-        --------
-        n : str
+        Returns
+        -------
+        str
             Node name.
 
         """
@@ -494,20 +510,21 @@ class Yarf():
             return None
     
     def get_mna_extra_rows_dict(self, analysis):
-        """Return a mapping of the independent vsources to the device instances.
+        """
+        Return a mapping of the independent vsources to the device instances.
 
         Many devices require in their companion models additional rows to
         describe their behavior, associated with independent vsources. This
         method maps what are the MNA rows assigned to each device.
 
         Parameters
-        ------------
+        ----------
         analysis : str
             Name of the analysis to get the dictionary from.
 
-        Return
-        --------
-        iidx : :class:`dict`
+        Returns
+        -------
+        :class:`dict`
             Maps an independent vsource index in the MNA formulation to the
             device instance responsible for it.
 
@@ -522,16 +539,17 @@ class Yarf():
         return iidx
 
     def get_voltage_idx(self, name):
-        """Return the row of the node voltage in the MNA formulation.
+        """
+        Return the row of the node voltage in the MNA formulation.
 
         Parameters
-        ------------
+        ----------
         name : str
             Name of the node to get the MNA index.
 
-        Return
-        --------
-        n : int
+        Returns
+        -------
+        int
             Node voltage index in the MNA formulation.
 
         """
@@ -543,18 +561,19 @@ class Yarf():
             return None
 
     def get_voltage(self, analysis, node):
-        """Return the voltage result for a determined node and analysis.
+        """
+        Return the voltage result for a determined node and analysis.
 
         Parameters
-        ------------
+        ----------
         analysis : str
             Name of the analysis to get the results from.
         node : str
             Name of the node to consult the result voltage.
 
-        Return
-        --------
-        sol : :class:`numpy.ndarray`
+        Returns
+        -------
+        :class:`numpy.ndarray`
             Voltage result for a determined node and analysis.
 
         """
@@ -570,32 +589,33 @@ class Yarf():
             return None
 
     def get_freqs(self, analysis):
-        """Return the frequency array of an AC analysis.
+        """
+        Return the frequency array of an AC analysis.
 
         Parameters
-        ------------
+        ----------
         analysis : str
             Name of the analysis to get the frequencies from.
         
-        Return
-        --------
-        f : :class:`numpy.ndarray`
+        Returns
+        -------
+        :class:`numpy.ndarray`
             Frequency array.
 
         """
         a = self.get_analysis(analysis)
         if isinstance(a, AC):
-            f = a.get_freqs()
-            return f
+            return a.get_freqs()
         else:
             logger.warning('Analysis doesn\'t have a frequency array!')
             return None
 
     def print_dc_voltages(self, name):
-        """Print the DC voltages in the circuit.
+        """
+        Print the DC voltages in the circuit.
 
         Parameters
-        ------------
+        ----------
         name : str
             Name of the analysis to print the results.
 
@@ -610,10 +630,11 @@ class Yarf():
             logger.warning('Unknown analysis name: {}!'.format(name))
     
     def print_dc_currents(self, name):
-        """Print the DC currents in the circuit.
+        """
+        Print the DC currents in the circuit.
 
         Parameters
-        ------------
+        ----------
         name : str
             Name of the analysis to print the results.
 

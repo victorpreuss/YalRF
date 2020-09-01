@@ -1,9 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 
-import sys
-sys.path.append("../yarf")
-
+import setup
 from yarf import Yarf
 
 y = Yarf('BJT AC Testbench')
@@ -27,8 +25,7 @@ xdc = y.run('DC1')
 ac1 = y.add_ac_analysis('AC1', start=10e6, stop=10e9, numpts=30, sweeptype='logarithm')
 xac = y.run('AC1', xdc)
 
-freqs = ac1.get_freqs()
-
+freqs = y.get_freqs('AC1')
 vb = y.get_voltage('AC1', 'nb')
 vc = y.get_voltage('AC1', 'nc')
 

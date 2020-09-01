@@ -1,9 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 
-import sys
-sys.path.append("../yarf")
-
+import setup
 from yarf import Yarf
 
 y = Yarf("Hello World!")

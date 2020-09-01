@@ -66,12 +66,12 @@ class DC():
         # TODO: create initial guess vector from nodeset (forget x0)
         x0 = np.zeros((len(A)-1, 1)) if x0 is None else x0
 
-        # Here we go!
-        logger.info('Starting DC analysis.')
-
         # some devices have initialization routines
         for dev in y.get_devices():
             dev.init()
+
+        # Here we go!
+        logger.info('Starting DC analysis.')
 
         # populate the matrices A and z with the linear devices stamps
         for dev in self.lin_devs:
@@ -98,17 +98,17 @@ class DC():
             logger.info('Finished DC analysis.')
             return self.x
 
-        # solve DC analysis using the gmin stepping algorithm
+        # solve DC analysis using the gmin stepping continuation method
         if self.options['use_gmin_stepping'] == True:
-            logger.info('Previous solver failed! Using gmin stepping algorithm ...')
+            logger.info('Previous solver failed! Using gmin stepping ...')
             issolved = self.solve_dc_nonlinear_using_gmin_stepping(A, z, x0)
             if issolved:
                 logger.info('Finished DC analysis.')
                 return self.x
 
-        # solve DC analysis using the source stepping algorithm
+        # solve DC analysis using the source stepping continuation method
         if self.options['use_source_stepping'] == True:
-            logger.info('Previous solver failed! Using source stepping algorithm ...')
+            logger.info('Previous solver failed! Using source stepping ...')
             issolved = self.solve_dc_nonlinear_using_source_stepping(A, z, x0)
             if issolved:
                 logger.info('Finished DC analysis.')
