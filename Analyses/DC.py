@@ -5,22 +5,7 @@ import scipy.sparse
 import scipy.sparse.linalg
 
 from yarf.Devices import *
-
-import logging
-
-logger = logging.getLogger(__name__)
-logger.setLevel(logging.INFO)
-
-formatter = logging.Formatter('[%(levelname)s]: %(name)s: %(message)s')
-
-# file_handler = logging.FileHandler('DC.log')
-# file_handler.setFormatter(formatter)
-
-stream_handler = logging.StreamHandler()
-stream_handler.setFormatter(formatter)
-
-# logger.addHandler(file_handler) # enable file logging
-logger.addHandler(stream_handler) # enable console logging
+from yarf.Utils import dc_logger as logger
 
 options = dict()
 options['is_sparse'] = False
@@ -31,6 +16,10 @@ options['gmin'] = 1e-12
 options['reltol'] = 1e-3
 options['vabstol'] = 1e-6
 options['iabstol'] = 1e-12
+
+# continuation methods
+options['use_gmin_stepping'] = True
+options['use_source_stepping'] = True
 
 # parameters for the gmin stepping algorithm
 options['gmin_max'] = 0.01    # initial conductance
@@ -45,8 +34,10 @@ options['source_maxiter'] = 50
 
 class DC():
     
-    def __init__(self, name):
+    def __init__(self, name, nodeset=None):
         self.name = name
+
+        self.nodeset = nodeset
         self.x = None
         
         self.n = 0            # number of uniquely named nodes including 'gnd'
@@ -84,20 +75,16 @@ class DC():
             idx = self.iidx[dev] if dev in self.iidx else None
             dev.add_dc_stamps(A, z, None, idx)
 
-        # TODO: add gmin at the floating nodes such as middle of two
-        #       capacitors or nodes with only one device attached,
-        #       otherwise the matrix problem may become singular.
-        #       also need to do some sanity checks in the netlist
-        #       perhaps using some graph connectivity algorithm.
-        #       meanwhile: add gmin to all nodes :-)
+        # TODO: add gmin only at floating nodes such as middle of two
+        #       capacitors or in parallel to nonlinear devices.
         A = A + np.eye(len(A)) * self.options['gmin']
 
-        # create initial guess vector (TODO: nodeset)
+        # TODO: create initial guess vector from nodeset (forget x0)
         x0 = np.zeros((len(A)-1, 1)) if x0 is None else x0
 
         if self.nonlin_devs == []:
             logger.info('Starting linear DC solver ...')
-            issolved = self.solve_dc_linear(A, z)
+            self.x, issolved = self.solve_linear(A[1:,1:], z[1:])
             if issolved:
                 return self.x
 
@@ -106,31 +93,33 @@ class DC():
         if issolved:
             return self.x
 
-        logger.info('Previous solver failed! Enabling gmin stepping algorithm ...')
-        issolved = self.solve_dc_nonlinear_using_gmin_stepping(A, z, x0)
-        if issolved:
-            return self.x
+        if self.options['use_gmin_stepping'] == True:
+            logger.info('Previous solver failed! Using gmin stepping algorithm ...')
+            issolved = self.solve_dc_nonlinear_using_gmin_stepping(A, z, x0)
+            if issolved:
+                return self.x
 
-        logger.info('Previous solver failed! Enabling source stepping algorithm ...')
-        issolved = self.solve_dc_nonlinear_using_source_stepping(A, z, x0)
-        if issolved:
-            return self.x
+        if self.options['use_source_stepping'] == True:
+            logger.info('Previous solver failed! Using source stepping algorithm ...')
+            issolved = self.solve_dc_nonlinear_using_source_stepping(A, z, x0)
+            if issolved:
+                return self.x
 
-        # TODO: implement line search algorithm here
+        # TODO: implement more continuations/homotopy techniques here
 
         logger.error('DC analysis failed to converge!')
         return None
     
-    def solve_dc_linear(self, A, z):
-        if self.options['is_sparse'] == True:
-            An = scipy.sparse.csc_matrix(A[1:,1:])
+    def solve_linear(self, A, z, is_sparse=False):
+        if is_sparse == True:
+            An = scipy.sparse.csc_matrix(A)
             lu = scipy.sparse.linalg.splu(An)
-            self.x = lu.solve(z[1:])
+            x = lu.solve(z)
         else:
-            lu, piv = scipy.linalg.lu_factor(A[1:,1:])
-            self.x = scipy.linalg.lu_solve((lu, piv), z[1:])
+            lu, piv = scipy.linalg.lu_factor(A)
+            x = scipy.linalg.lu_solve((lu, piv), z)
 
-        return not np.isnan(np.sum(self.x))
+        return x, not np.isnan(np.sum(x))
 
     def solve_dc_nonlinear(self, A, z, x0):
         # get the configuration parameters
@@ -145,26 +134,24 @@ class DC():
         converged = False
         k = 0
         while (not converged) and (k < maxiter):
-            # refresh nonlinear MNA matrices
+            # refresh matrices
             Anl[:,:] = 0.0
             znl[:] = 0.0
 
-            # add nonlinear devices to the MNA system
+            # add nonlinear element stamps
             for dev in self.nonlin_devs:
                 idx = self.iidx[dev] if dev in self.iidx else None
                 dev.add_dc_stamps(Anl, znl, xk, idx)
 
             # index slicing is used to remove the 'gnd' node
-            # Anl and znl add the nonlinear element stamps
+            # An is the Jacobian matrix of the Newton-Raphson iteration
             An = A[1:,1:] + Anl[1:,1:]
             zn = z[1:] + znl[1:]
 
-            # TODO: use sparse methods if 'is_sparse' is set
-            #       add exception handling here (?)
-            lu, piv = scipy.linalg.lu_factor(An)
-            self.x  = scipy.linalg.lu_solve((lu, piv), zn)
+            # solve linear system
+            self.x, issolved = self.solve_linear(An, zn, self.options['is_sparse'])
 
-            if np.isnan(np.sum(self.x)):
+            if not issolved:
                 logger.debug('Failed to resolve linear system! Solution has NaN ...')
                 return False
 
@@ -188,7 +175,7 @@ class DC():
                 xk = self.x
                 k = k + 1
 
-            logger.debug('A:\n{}\nAnl:\n{}\nz:\n{}\nznl\n{}'.format(A, Anl[1:,1:], z, znl[1:]))
+            logger.debug('A:\n{}\nAnl:\n{}\nz:\n{}\nznl\n{}'.format(A, Anl, z, znl))
             logger.debug('xk:\n{}\nx:\n{}'.format(xk, self.x))
 
         return converged
@@ -231,7 +218,6 @@ class DC():
                 if gmin > gmin_max:
                     converged = False
                     break
-
             k = k + 1
 
         return converged
@@ -256,7 +242,8 @@ class DC():
 
             # check if convergence is reached
             if issolved:
-                xprev = self.x # backup of good solution
+                # backup of good solution
+                xprev = self.x 
 
                 if alpha >= 1.0:
                     converged = True
@@ -266,7 +253,8 @@ class DC():
                     if alpha >= 1.0:
                         alpha = 1.0
             else:
-                self.x = xprev # restore backup of good solution
+                # restore backup of good solution
+                self.x = xprev 
 
                 # decrease rate of source stepping if convergence fails
                 alpha = alpha - alpha_delta / 2
@@ -275,7 +263,6 @@ class DC():
                 if alpha > alpha_min:
                     converged = False
                     break
-
             k = k + 1
 
         return converged

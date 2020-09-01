@@ -7,3 +7,4 @@ tags
 __pycache__/
 Analyses/__pycache__/
 Devices/__pycache__/
+.vscode/

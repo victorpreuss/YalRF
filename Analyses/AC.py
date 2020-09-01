@@ -6,22 +6,7 @@ import scipy.sparse.linalg
 
 from yarf.Devices import *
 from yarf.Analyses import DC
-
-import logging
-
-logger = logging.getLogger(__name__)
-logger.setLevel(logging.INFO)
-
-formatter = logging.Formatter('[%(levelname)s]: %(name)s: %(message)s')
-
-# file_handler = logging.FileHandler('AC.log')
-# file_handler.setFormatter(formatter)
-
-stream_handler = logging.StreamHandler()
-stream_handler.setFormatter(formatter)
-
-# logger.addHandler(file_handler) # enable file logging
-logger.addHandler(stream_handler) # enable console logging
+from yarf.Utils import ac_logger as logger
 
 options = dict()
 options['is_sparse'] = False
@@ -54,17 +39,6 @@ class AC():
         
         self.options = options.copy() # AC simulation options
 
-        if sweeptype == 'linear':
-            if stepsize is not None:
-                self.freqs = np.arange(start, stop, step)
-            else:
-                self.freqs = np.linspace(start, stop, numpts)
-        elif sweeptype == 'logarithm':
-            self.freqs = np.geomspace(start, stop, numpts)
-        else:
-            logger.warning('Failed to calculate the frequencies vector!')
-            self.freqs = np.array([start, stop])
-
     def get_dc_solution(self):
         return self.xdc
 
@@ -80,10 +54,10 @@ class AC():
         self.m = y.get_m('ac')
         self.devs = y.get_devices()
         self.iidx = y.get_mna_extra_rows_dict('ac')
-
+        
         # perform DC simulation if no operating point is provided
         if x0 is None:
-            dc = DC(self.name + 'DC')
+            dc = DC(self.name + '.DC')
             self.xdc = dc.run(y)
         else:
             self.xdc = x0
@@ -100,7 +74,10 @@ class AC():
         A = np.zeros((self.n+self.m, self.n+self.m), dtype=complex)
         z = np.zeros((self.n+self.m, 1), dtype=complex)
 
-        # create complex matrix to hold the AC solution
+        # create array with frequencies to simulate
+        self.create_freqs_array()
+
+        # create matrix to hold the AC solution
         self.xac = np.empty((len(self.freqs), len(z)-1), dtype=complex)
 
         k = 0
@@ -118,7 +95,7 @@ class AC():
             A = A + np.eye(len(A)) * self.options['gmin']
 
             # solve complex linear system
-            xac, issolved = self.solve_ac_linear(A, z)
+            xac, issolved = self.solve_linear(A[1:,1:], z[1:], self.options['is_sparse'])
 
             # linear system is solved: add the solution to output
             # otherwise: add zeroes as solution and issue error log
@@ -134,16 +111,27 @@ class AC():
         logger.info('Finished AC analysis.')
         return self.xac
 
-    def solve_ac_linear(self, A, z):
-        if self.options['is_sparse'] == True:
-            An = scipy.sparse.csc_matrix(A[1:,1:])
+    def solve_linear(self, A, z, is_sparse=False):
+        if is_sparse == True:
+            An = scipy.sparse.csc_matrix(A)
             lu = scipy.sparse.linalg.splu(An)
-            xac = lu.solve(z[1:])
+            x = lu.solve(z)
         else:
-            lu, piv = scipy.linalg.lu_factor(A[1:,1:])
-            xac = scipy.linalg.lu_solve((lu, piv), z[1:])
+            lu, piv = scipy.linalg.lu_factor(A)
+            x = scipy.linalg.lu_solve((lu, piv), z)
 
-        return xac, not np.isnan(np.sum(xac))
+        return x, not np.isnan(np.sum(x))
 
+    def create_freqs_array(self):
+        if self.sweeptype == 'linear':
+            if self.stepsize is not None:
+                self.freqs = np.arange(self.start, self.stop, self.step)
+            else:
+                self.freqs = np.linspace(self.start, self.stop, self.numpts)
+        elif self.sweeptype == 'logarithm':
+            self.freqs = np.geomspace(self.start, self.stop, self.numpts)
+        else:
+            logger.warning('Failed to calculate the frequencies vector!')
+            self.freqs = np.array([self.start, self.stop])
 
 

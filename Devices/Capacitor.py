@@ -27,5 +27,7 @@ class Capacitor():
         A[self.n1][self.n2] = A[self.n1][self.n2] - y
         A[self.n2][self.n1] = A[self.n2][self.n1] - y
 
+    # def add_tran_stamps(self, A, z, x, ):
+
     def __str__(self):
         return 'Capacitor: {}\nNodes = {} -> {}\nValue = {}\n'.format(self.name, self.n1, self.n2, self.C)

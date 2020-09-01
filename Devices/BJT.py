@@ -65,7 +65,7 @@ class BJT():
         self.n1   = n1 # base (B)
         self.n2   = n2 # collector (C)
         self.n3   = n3 # emitter (E)
-        self.n4   = n4 # sbustrate (S)
+        self.n4   = n4 # substrate (S)
 
         self.options = options.copy() # bjt options
         self.oppoint = {}
