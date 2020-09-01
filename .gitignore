@@ -4,7 +4,7 @@ tags
 *.pyc
 *.pyo
 
-__pycache__/
-Analyses/__pycache__/
-Devices/__pycache__/
+Yarf/__pycache__/
+Yarf/Analyses/__pycache__/
+Yarf/Devices/__pycache__/
 .vscode/
