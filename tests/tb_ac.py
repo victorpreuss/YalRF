@@ -1,9 +1,11 @@
 import numpy as np
 import matplotlib.pyplot as plt
 
+import sys
+sys.path.append("../yarf")
+
 from yarf import Yarf
 
-# can only use 'gnd' for ground node
 y = Yarf("Hello World!")
 
 y.add_vsource('V1', 'n1', 'gnd', dc=0, ac=1)
@@ -25,14 +27,11 @@ ac = y.add_ac_analysis('AC1', start=970, stop=1030, numpts=50)
 
 sol = y.run('AC1')
 
-f = ac.get_freqs()
-x = []
-out = y.get_voltage_idx('n8')
-for v in sol:
-    x.append(v[out])
+freq = y.get_freqs('AC1')
+vout = y.get_voltage('AC1', 'n8')
 
 plt.figure(1)
-plt.plot(f, np.abs(x))
+plt.plot(freq, np.abs(vout))
 plt.grid()
 plt.title('AC Simulation')
 plt.xlabel('Frequencies')

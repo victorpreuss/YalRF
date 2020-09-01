@@ -5,8 +5,7 @@ import scipy.sparse
 import scipy.sparse.linalg
 
 from yarf.Devices import *
-
-import logging
+from yarf.Utils import tr_logger as logger
 
 class Transient():
 

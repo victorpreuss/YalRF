@@ -2,8 +2,6 @@ from .Devices import *
 from .Analyses import *
 from .Utils import yarf_logger as logger
 
-print(__name__)
-
 class Yarf():
     """Class containing the Yarf API for circuit simulation.
     
@@ -34,7 +32,7 @@ class Yarf():
         self.analyses = {}                  # list of analysis objects (DC, AC, Transient, ...)
 
     def add_ac_analysis(self, name, start, stop, numpts=10, stepsize=None, sweeptype='linear'):
-        """Create and add AC analysis.
+        """Create and add an AC analysis.
 
         Parameters
         ------------
@@ -68,7 +66,7 @@ class Yarf():
             return None
 
     def add_dc_analysis(self, name, nodeset=None):
-        """Create and add DC analysis.
+        """Create and add a DC analysis.
 
         Parameters
         ------------
@@ -327,10 +325,12 @@ class Yarf():
         return bjt
 
     # TODO:
-    # def add_mosfet():
-    # def add_iprobe():
-    # def add_transformer():
-    # def add_subcircuit('instance name', yarf object):
+    # def add_mosfet(self, name, n1, n2, n3, n4='gnd'):
+    # def add_iprobe(self, name):
+    # def add_transformer(self, name, n1, n2, n3, n4, T):
+    # def add_subcircuit(self, name, yarf object):
+    # def remove_device(self, name):
+    # def remove_analysis(self, name):
 
     def add_node(self, n):
         """Add node and returns its index in the netlist.
@@ -602,6 +602,7 @@ class Yarf():
         """
         if name in self.analyses:
             x = self.analyses[name].get_dc_solution()
+            print('DC Voltages:')
             for i in range(1, self.get_n()):
                 print('{}:\t{:0.4f} V'.format(self.node_idx_to_name[i], x[i-1,0]))
             print()

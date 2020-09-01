@@ -1,7 +1,9 @@
 import numpy as np
 import matplotlib.pyplot as plt
 
-# Here we go!
+import sys
+sys.path.append("../yarf")
+
 from yarf import Yarf
 
 y = Yarf('Diode Testbench')

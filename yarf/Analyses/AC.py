@@ -35,7 +35,7 @@ class AC():
         self.n = 0     # number of uniquely named nodes including 'gnd'
         self.m = 0     # number of independent voltage sources
         self.devs = [] # list of devices
-        self.iidx = {} # maps a indep. vsource idx in the MNA to a device
+        self.iidx = {} # maps an indep. vsource idx in the MNA to a device
         
         self.options = options.copy() # AC simulation options
 
@@ -74,7 +74,7 @@ class AC():
         A = np.zeros((self.n+self.m, self.n+self.m), dtype=complex)
         z = np.zeros((self.n+self.m, 1), dtype=complex)
 
-        # create array with frequencies to simulate
+        # create array with frequencies to be simulated
         self.create_freqs_array()
 
         # create matrix to hold the AC solution

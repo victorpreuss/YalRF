@@ -1,9 +1,11 @@
 import numpy as np
 import matplotlib.pyplot as plt
 
+import sys
+sys.path.append("../yarf")
+
 from yarf import Yarf
 
-# can only use 'gnd' for ground node
 y = Yarf("Hello World!")
 
 y.add_vsource('V1', 'n1', 'gnd', dc=0, ac=1)

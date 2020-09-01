@@ -31,4 +31,12 @@ ac_logger.addHandler(stream_handler)
 #file_handler.setFormatter(formatter)
 #ac_logger.addHandler(file_handler)
 
+""" Transient Analysis Logger """
+tr_logger = logging.getLogger('Yarf.Analyses.Transient')
+tr_logger.setLevel(logging.INFO)
 
+tr_logger.addHandler(stream_handler)
+
+#file_handler = logging.FileHandler('AC.log')
+#file_handler.setFormatter(formatter)
+#ac_logger.addHandler(file_handler)

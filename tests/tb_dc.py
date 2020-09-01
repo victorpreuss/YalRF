@@ -1,6 +1,8 @@
+import sys
+sys.path.append("../yarf")
+
 from yarf import Yarf
 
-# can only use 'gnd' for ground node
 y = Yarf("Hello World!")
 
 y.add_resistor('R1', 'n1', 'n2', 100)
@@ -23,17 +25,9 @@ y.add_vcvs('SRC1', 'n3', 'n7', 'n8', 'n5', 1.7)
 y.add_ccvs('SRC2', 'n7', 'n9', 'gnd', 'n5', 12.4)
 
 dc = y.add_dc_analysis('DC1')
-# dc = y.get_analysis('DC1')
-# dc.options['is_sparse'] = False
 
 y.run('DC1')
 
 y.print_dc_voltages('DC1')
 y.print_dc_currents('DC1')
 
-# print(sol)
-# print(y.node_name)
-# print(y.nodes)
-
-# for e in y.devices:
-#     print(e)

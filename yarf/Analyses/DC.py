@@ -42,7 +42,7 @@ class DC():
         
         self.n = 0            # number of uniquely named nodes including 'gnd'
         self.m = 0            # number of independent voltage sources
-        self.iidx = {}        # maps a indep. vsource idx in the MNA to a device
+        self.iidx = {}        # maps an indep. vsource idx in the MNA to a device
         self.lin_devs = []    # list of linear devices
         self.nonlin_devs = [] # list of nonlinear devices
         
@@ -52,9 +52,6 @@ class DC():
         return self.x
 
     def run(self, y, x0=None):
-        # Here we go!
-        logger.info('Starting DC analysis.')
-
         # get netlist parameters and data structures
         self.n = y.get_n()
         self.m = y.get_m('dc')
@@ -66,6 +63,12 @@ class DC():
         A = np.zeros((self.n+self.m, self.n+self.m))
         z = np.zeros((self.n+self.m, 1))
 
+        # TODO: create initial guess vector from nodeset (forget x0)
+        x0 = np.zeros((len(A)-1, 1)) if x0 is None else x0
+
+        # Here we go!
+        logger.info('Starting DC analysis.')
+
         # some devices have initialization routines
         for dev in y.get_devices():
             dev.init()
@@ -75,34 +78,40 @@ class DC():
             idx = self.iidx[dev] if dev in self.iidx else None
             dev.add_dc_stamps(A, z, None, idx)
 
-        # TODO: add gmin only at floating nodes such as middle of two
-        #       capacitors or in parallel to nonlinear devices.
+        # TODO: add gmin only at problematic nodes such as middle of two
+        #       capacitors or in parallel to pn junctions (high conductance) to
+        #       prevent the occurence of a singular matrix.
         A = A + np.eye(len(A)) * self.options['gmin']
 
-        # TODO: create initial guess vector from nodeset (forget x0)
-        x0 = np.zeros((len(A)-1, 1)) if x0 is None else x0
-
-        if self.nonlin_devs == []:
+        # if there is not a nonlinear device, simply solve the linear system
+        if not self.nonlin_devs:
             logger.info('Starting linear DC solver ...')
             self.x, issolved = self.solve_linear(A[1:,1:], z[1:])
             if issolved:
+                logger.info('Finished DC analysis.')
                 return self.x
 
+        # solve nonlinear DC analysis using Newton-Raphson
         logger.info('Starting nonlinear DC solver ...')
         issolved = self.solve_dc_nonlinear(A, z, x0)
         if issolved:
+            logger.info('Finished DC analysis.')
             return self.x
 
+        # solve DC analysis using the gmin stepping algorithm
         if self.options['use_gmin_stepping'] == True:
             logger.info('Previous solver failed! Using gmin stepping algorithm ...')
             issolved = self.solve_dc_nonlinear_using_gmin_stepping(A, z, x0)
             if issolved:
+                logger.info('Finished DC analysis.')
                 return self.x
 
+        # solve DC analysis using the source stepping algorithm
         if self.options['use_source_stepping'] == True:
             logger.info('Previous solver failed! Using source stepping algorithm ...')
             issolved = self.solve_dc_nonlinear_using_source_stepping(A, z, x0)
             if issolved:
+                logger.info('Finished DC analysis.')
                 return self.x
 
         # TODO: implement more continuations/homotopy techniques here
