@@ -1,0 +1,24 @@
+* Circuit 1
+
+R1 n1 n2  100
+R2 0 n2  25
+R3 n5 n3  50
+R4 n8 n7  33
+R5 n5 n8  66
+R6 0 n9  50
+
+C1 n3 n4  1P 
+L1 n2 n4  1N 
+L2 0 n5  1N 
+
+V1 n1 0 DC 10
+V2 n3 n2 DC 7
+I1 n1 n4 DC 2A
+
+ESRC1 n7 n8 n3 n5 1.7
+HSRC2 n9 0  VSRC2 12.4
+VSRC2 n7 n5 DC 0 
+
+.DC V1 1 10 1
+.PRINT DC file=circuit1.prn V(n1) V(n2) V(n3) V(n4) V(n5) V(n7) V(n8) V(n9)
+.END
