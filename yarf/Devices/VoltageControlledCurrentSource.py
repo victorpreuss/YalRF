@@ -1,13 +1,13 @@
 class VoltageControlledCurrentSource():
     
-    def __init__(self, name, n1, n2, n3, n4, G=1, tau=None):
+    def __init__(self, name, n1, n2, n3, n4, G=1, tau=0):
         self.name = name
-        self.n1    = n1
-        self.n2    = n2
-        self.n3    = n3
-        self.n4    = n4
-        self.G     = G
-        self.tau   = tau
+        self.n1   = n1
+        self.n2   = n2
+        self.n3   = n3
+        self.n4   = n4
+        self.G    = float(G)
+        self.tau  = float(tau)
 
     def get_num_vsources(self, analysis):
         return 0

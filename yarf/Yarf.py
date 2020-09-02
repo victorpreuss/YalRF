@@ -137,7 +137,7 @@ class Yarf():
 
         Returns
         -------
-        res : :class:`Resistor`
+        :class:`Resistor`
             Reference to the created Resistor object.
 
         """
@@ -204,7 +204,7 @@ class Yarf():
         self.devices.append(ind)
         return ind
 
-    def add_vdc(self, name, n1, n2, dc=0):
+    def add_vdc(self, name, n1, n2, dc):
         """
         Add DC voltage source to the netlist.
 
@@ -232,7 +232,7 @@ class Yarf():
         self.devices.append(vdc)
         return vdc
 
-    def add_idc(self, name, n1, n2, dc=0):
+    def add_idc(self, name, n1, n2, dc):
         """
         Add DC current source to the netlist.
 
@@ -260,23 +260,83 @@ class Yarf():
         self.devices.append(idc)
         return idc
 
-    def add_vsource(self, name, n1, n2, vtype=None, dc=0, ac=0, phase=0):
+    def add_vac(self, name, n1, n2, ac, phase=0):
+        """
+        Add AC voltage source to the netlist.
+
+        Parameters
+        ----------
+        name : str
+            Name of the device.
+        n1 : str
+            Positive node of the voltage source.
+        n2 : str
+            Negative node of the voltage source.
+        ac : float
+            AC voltage value in Volts.
+        phase : float
+            Phase of the AC voltage source
+
+        Returns
+        -------
+        :class:`VoltageSource`
+            Reference to the created VoltageSource object.
+
+        """
         n1 = self.add_node(n1)
         n2 = self.add_node(n2)
         
-        vsource = VoltageSource(name, n1, n2, vtype, dc, ac, phase)
+        vac = VoltageSource(name, n1, n2, vtype='ac', ac=ac, phase=phase)
+        self.devices.append(vac)
+        return vac
+
+    def add_iac(self, name, n1, n2, ac, phase=0):
+        """
+        Add AC current source to the netlist.
+
+        Parameters
+        ----------
+        name : str
+            Name of the device.
+        n1 : str
+            Positive node of the current source.
+        n2 : str
+            Negative node of the current source.
+        ac : float
+            AC current value in Amperes.
+        phase : float
+            Phase of the AC current source
+
+        Returns
+        -------
+        :class:`CurrentSource`
+            Reference to the created CurrentSource object.
+
+        """
+        n1 = self.add_node(n1)
+        n2 = self.add_node(n2)
+        
+        iac = CurrentSource(name, n1, n2, itype='ac', ac=ac, phase=phase)
+        self.devices.append(iac)
+        return iac
+
+    def add_vsource(self, name, n1, n2, dc, ac, phase):
+        n1 = self.add_node(n1)
+        n2 = self.add_node(n2)
+        
+        vsource = VoltageSource(name, n1, n2, vtype=None, dc, ac, phase)
         self.devices.append(vsource)
         return vsource
 
-    def add_isource(self, name, n1, n2, itype=None, dc=0, ac=0, phase=0):
+    def add_isource(self, name, n1, n2, dc, ac, phase):
         n1 = self.add_node(n1)
         n2 = self.add_node(n2)
         
-        isource = CurrentSource(name, n1, n2, itype, dc, ac, phase)
+        isource = CurrentSource(name, n1, n2, itype=None, dc, ac, phase)
         self.devices.append(isource)
         return isource
 
-    def add_vcvs(self, name, n1, n2, n3, n4, G=1.0, tau=None):
+    def add_vcvs(self, name, n1, n2, n3, n4, G, tau=0):
         n1 = self.add_node(n1)
         n2 = self.add_node(n2)
         n3 = self.add_node(n3)
@@ -286,7 +346,7 @@ class Yarf():
         self.devices.append(vcvs)
         return vcvs
 
-    def add_vccs(self, name, n1, n2, n3, n4, G=1.0, tau=None):
+    def add_vccs(self, name, n1, n2, n3, n4, G, tau=0):
         n1 = self.add_node(n1)
         n2 = self.add_node(n2)
         n3 = self.add_node(n3)
@@ -296,7 +356,7 @@ class Yarf():
         self.devices.append(vccs)
         return vccs
         
-    def add_ccvs(self, name, n1, n2, n3, n4, G=1.0, tau=None):
+    def add_ccvs(self, name, n1, n2, n3, n4, G, tau=0):
         n1 = self.add_node(n1)
         n2 = self.add_node(n2)
         n3 = self.add_node(n3)
@@ -306,7 +366,7 @@ class Yarf():
         self.devices.append(ccvs)
         return ccvs
         
-    def add_cccs(self, name, n1, n2, n3, n4, G=1.0, tau=None):
+    def add_cccs(self, name, n1, n2, n3, n4, G, tau=0):
         n1 = self.add_node(n1)
         n2 = self.add_node(n2)
         n3 = self.add_node(n3)
@@ -524,7 +584,7 @@ class Yarf():
 
         Returns
         -------
-        :class:`dict`
+        dict
             Maps an independent vsource index in the MNA formulation to the
             device instance responsible for it.
 
@@ -579,7 +639,7 @@ class Yarf():
         """
         a = self.get_analysis(analysis)
         if isinstance(a, DC):
-            sol = a.get_dc_solution()[self.get_voltage_idx(node)]
+            sol = a.get_dc_solution()[self.get_voltage_idx(node), 0]
             return sol
         elif isinstance(a, AC):
             sol = a.get_ac_solution()[:, self.get_voltage_idx(node)]
@@ -654,6 +714,7 @@ class Yarf():
             print()
         else:
             logger.warning('Unknown analysis name: {}!'.format(name))
+
 
     
 

@@ -12,7 +12,7 @@ class VoltageSource():
         self.phase = np.radians(float(phase))
 
     def get_num_vsources(self, analysis):
-        return 1
+            return 1
 
     def is_nonlinear(self):
         return False
@@ -27,6 +27,10 @@ class VoltageSource():
         A[iidx][self.n2] = -1.0
         z[iidx] = self.dc
 
+        # ac voltage source is a short (0V) at dc
+        if self.vtype == 'ac':
+            z[iidx] = 0        
+
     def add_ac_stamps(self, A, z, x, iidx, freq):
         A[self.n1][iidx] = +1.0 
         A[self.n2][iidx] = -1.0 
@@ -34,9 +38,15 @@ class VoltageSource():
         A[iidx][self.n2] = -1.0
         z[iidx] = self.ac * np.exp(1j * self.phase)
 
+        # dc voltage source is a short (0V) at ac
+        if self.vtype == 'dc':
+            z[iidx] = 0
+
     def __str__(self):
-        out = ''
-        if self.vtype.lower() == 'dc':
-            out = 'Voltage Source: {}\nNodes = {} -> {}\nVdc = {}\n'.format(self.name, self.n1, self.n2, self.dc)
-        return out
+        return 'Voltage Source: {}\nNodes: {} -> {}\nVdc = {}\nVac = {}\nPhase = {}'.format(self.name,
+                                                                                            self.n1,
+                                                                                            self.n2,
+                                                                                            self.dc,
+                                                                                            self.ac,
+                                                                                            np.degrees(self.phase))
 
