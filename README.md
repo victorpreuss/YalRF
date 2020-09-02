@@ -43,14 +43,13 @@ y.print_dc_currents('DC1')
 - [x] creation of MNA matrices using element stamps
 
 ## Modelling Related:
-- [ ] add ac model of controlled sources
-- [ ] fix/differentiate dc and ac model for vsource and isources
 - [ ] implement mosfet (level 3 model and maybe some bsim boy, see hspice doc)
 - [ ] implement transformer
 - [ ] implement current probe
 - [ ] transmission lines
 - [ ] S-Parameter model (AC analysis and ChirpZ for transient)
 - [ ] noise and temperature modelling
+- [x] add ac model of controlled sources
 - [x] AC models for AC analysis
 - [x] implement diode model
 - [x] implement bjt spice gummel-poon (TODO: check for singularities)
@@ -64,6 +63,7 @@ y.print_dc_currents('DC1')
 - [ ] add subcircuit support
 - [ ] add a remove method for devices and analyses
 - [ ] make the netlist not case sensitive (? not sure)
+- [x] fix/differentiate dc and ac model for vsource and isource
 - [x] declare logger objects someplace else
 - [x] add easy methods to access the results (e.g. get_v('R1'))
 - [x] create git repository

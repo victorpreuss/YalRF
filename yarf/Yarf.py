@@ -320,23 +320,97 @@ class Yarf():
         self.devices.append(iac)
         return iac
 
-    def add_vsource(self, name, n1, n2, dc, ac, phase):
+    def add_vsource(self, name, n1, n2, dc, ac, phase=0):
+        """
+        Add a voltage source to the netlist with DC and AC values.
+
+        Parameters
+        ----------
+        name : str
+            Name of the device.
+        n1 : str
+            Positive node of the voltage source.
+        n2 : str
+            Negative node of the voltage source.
+        dc : float
+            DC voltage value in Volts.
+        ac : float
+            AC voltage value in Volts.
+        phase : float
+            Phase of the AC voltage source
+
+        Returns
+        -------
+        :class:`VoltageSource`
+            Reference to the created VoltageSource object.
+
+        """
         n1 = self.add_node(n1)
         n2 = self.add_node(n2)
         
-        vsource = VoltageSource(name, n1, n2, vtype=None, dc, ac, phase)
+        vsource = VoltageSource(name, n1, n2, vtype='both', dc, ac, phase)
         self.devices.append(vsource)
         return vsource
 
-    def add_isource(self, name, n1, n2, dc, ac, phase):
+    def add_isource(self, name, n1, n2, dc, ac, phase=0):
+        """
+        Add a current source to the netlist with DC and AC values.
+
+        Parameters
+        ----------
+        name : str
+            Name of the device.
+        n1 : str
+            Positive node of the current source.
+        n2 : str
+            Negative node of the current source.
+        dc : float
+            DC current value in Amperes.
+        ac : float
+            AC current value in Amperes.
+        phase : float
+            Phase of the AC current source
+
+        Returns
+        -------
+        :class:`CurrentSource`
+            Reference to the created CurrentSource object.
+
+        """
         n1 = self.add_node(n1)
         n2 = self.add_node(n2)
         
-        isource = CurrentSource(name, n1, n2, itype=None, dc, ac, phase)
+        isource = CurrentSource(name, n1, n2, itype='both', dc, ac, phase)
         self.devices.append(isource)
         return isource
 
     def add_vcvs(self, name, n1, n2, n3, n4, G, tau=0):
+        """
+        Add a voltage controlled voltage source to the netlist.
+
+        Parameters
+        ----------
+        name : str
+            Name of the device.
+        n1 : str
+            Node 1.
+        n2 : str
+            Node 2.
+        n3 : str
+            Node 3.
+        n4 : str
+            Node 4.
+        G : float
+            Gain/Transfer factor.
+        tau : float
+            Delay time.
+
+        Returns
+        -------
+        :class:`VoltageControlledVoltageSource`
+            Reference to the created VoltageControlledVoltageSource object.
+
+        """
         n1 = self.add_node(n1)
         n2 = self.add_node(n2)
         n3 = self.add_node(n3)
@@ -347,6 +421,32 @@ class Yarf():
         return vcvs
 
     def add_vccs(self, name, n1, n2, n3, n4, G, tau=0):
+        """
+        Add a voltage controlled current source to the netlist.
+
+        Parameters
+        ----------
+        name : str
+            Name of the device.
+        n1 : str
+            Node 1.
+        n2 : str
+            Node 2.
+        n3 : str
+            Node 3.
+        n4 : str
+            Node 4.
+        G : float
+            Gain/Transfer factor.
+        tau : float
+            Delay time.
+
+        Returns
+        -------
+        :class:`VoltageControlledCurrentSource`
+            Reference to the created VoltageControlledCurrentSource object.
+
+        """
         n1 = self.add_node(n1)
         n2 = self.add_node(n2)
         n3 = self.add_node(n3)
@@ -357,6 +457,32 @@ class Yarf():
         return vccs
         
     def add_ccvs(self, name, n1, n2, n3, n4, G, tau=0):
+        """
+        Add a current controlled voltage source to the netlist.
+
+        Parameters
+        ----------
+        name : str
+            Name of the device.
+        n1 : str
+            Node 1.
+        n2 : str
+            Node 2.
+        n3 : str
+            Node 3.
+        n4 : str
+            Node 4.
+        G : float
+            Gain/Transfer factor.
+        tau : float
+            Delay time.
+
+        Returns
+        -------
+        :class:`CurrentControlledVoltageSource`
+            Reference to the created CurrentControlledVoltageSource object.
+
+        """
         n1 = self.add_node(n1)
         n2 = self.add_node(n2)
         n3 = self.add_node(n3)
@@ -367,6 +493,32 @@ class Yarf():
         return ccvs
         
     def add_cccs(self, name, n1, n2, n3, n4, G, tau=0):
+        """
+        Add a current controlled current source to the netlist.
+
+        Parameters
+        ----------
+        name : str
+            Name of the device.
+        n1 : str
+            Node 1.
+        n2 : str
+            Node 2.
+        n3 : str
+            Node 3.
+        n4 : str
+            Node 4.
+        G : float
+            Gain/Transfer factor.
+        tau : float
+            Delay time.
+
+        Returns
+        -------
+        :class:`CurrentControlledCurrentSource`
+            Reference to the created CurrentControlledCurrentSource object.
+
+        """
         n1 = self.add_node(n1)
         n2 = self.add_node(n2)
         n3 = self.add_node(n3)
@@ -377,6 +529,34 @@ class Yarf():
         return cccs
 
     def add_diode(self, name, n1, n2):
+        """
+        Add a diode to the netlist.
+
+        The instance of the added diode is returned for the user. A dictionary
+        containing all the parameters for the diode can be accessed and editted
+        before the simulation is ran, to configure the model.
+
+        Parameters
+        ----------
+        name : str
+            Name of the device.
+        n1 : str
+            Anode (+).
+        n2 : str
+            Cathode (-).
+
+        Returns
+        -------
+        :class:`Diode`
+            Reference to the created Diode object. Useful to edit the model options.
+
+        Examples
+        --------
+
+        >>> d1 = y.add_diode('D1', 'n1', 'n2')
+        >>> d1.options['Is'] = 1e-15
+
+        """
         n1 = self.add_node(n1)
         n2 = self.add_node(n2)
         
@@ -385,6 +565,38 @@ class Yarf():
         return diode
 
     def add_bjt(self, name, n1, n2, n3, n4='gnd'):
+        """
+        Add a BJT to the netlist.
+
+        The instance of the added bjt is returned for the user. A dictionary
+        containing all the parameters for the bjt can be accessed and editted
+        before the simulation is ran, to configure the model.
+
+        Parameters
+        ----------
+        name : str
+            Name of the device.
+        n1 : str
+            Base (B).
+        n2 : str
+            Colector (C).
+        n3: str
+            Emitter(E).
+        n4: str
+            Substrate (S).
+
+        Returns
+        -------
+        :class:`BJT`
+            Reference to the created BJT object. Useful to edit the model options.
+
+        Examples
+        --------
+
+        >>> q1 = y.add_bjt('Q1', 'n1', 'n2', 'n3')
+        >>> q1.options['Bf'] = 500
+
+        """
         n1 = self.add_node(n1)
         n2 = self.add_node(n2)
         n3 = self.add_node(n3)

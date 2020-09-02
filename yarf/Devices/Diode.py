@@ -181,8 +181,8 @@ class Diode():
         N  = self.options['N']
         Vt = k * self.options['Temp'] / e
 
-        V1 = x[self.n1-1] if self.n1 else 0.0
-        V2 = x[self.n2-1] if self.n2 else 0.0
+        V1 = x[self.n1-1] if self.n1 else 0.
+        V2 = x[self.n2-1] if self.n2 else 0.
 
         Vd = V1 - V2
 

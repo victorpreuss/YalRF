@@ -20,9 +20,18 @@ class VoltageControlledVoltageSource():
 
     def add_dc_stamps(self, A, z, x, iidx):
         A[iidx][self.n1] = +self.G
-        A[iidx][self.n2] = -1.0 
-        A[iidx][self.n3] = +1.0 
+        A[iidx][self.n2] = -1.0
+        A[iidx][self.n3] = +1.0
         A[iidx][self.n4] = -self.G
+        A[self.n2][iidx] = -1.0
+        A[self.n3][iidx] = +1.0
+
+    def add_ac_stamps(self, A, z, x, iidx, freq):
+        G = self.G * np.exp(-1j * 2. * np.pi * freq * self.tau)
+        A[iidx][self.n1] = +G
+        A[iidx][self.n2] = -1.0
+        A[iidx][self.n3] = +1.0
+        A[iidx][self.n4] = -G
         A[self.n2][iidx] = -1.0
         A[self.n3][iidx] = +1.0
 

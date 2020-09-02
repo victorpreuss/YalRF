@@ -24,6 +24,13 @@ class VoltageControlledCurrentSource():
         A[self.n3][self.n1] = A[self.n3][self.n1] - self.G
         A[self.n3][self.n4] = A[self.n3][self.n1] + self.G
 
+    def add_ac_stamps(self, A, z, x, iidx, freq):
+        G = self.G * np.exp(-1j * 2. * np.pi * freq * self.tau)
+        A[self.n2][self.n1] = A[self.n3][self.n1] + G
+        A[self.n2][self.n4] = A[self.n3][self.n1] - G
+        A[self.n3][self.n1] = A[self.n3][self.n1] - G
+        A[self.n3][self.n4] = A[self.n3][self.n1] + G
+
     def __str__(self):
         return 'VCCS: {}\nNodes = {} -> {} and {}->{}\nG = {}\ndelay={}\n'.format(self.name, self.n1, self.n2, self.n3, self.n4, self.G, self.tau)
 

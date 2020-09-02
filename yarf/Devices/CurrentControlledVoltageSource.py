@@ -29,6 +29,18 @@ class CurrentControlledVoltageSource():
         A[self.n2][iidx+1] = +1.0
         A[self.n3][iidx+1] = -1.0
 
+    def add_ac_stamps(self, A, z, x, iidx, freq):
+        G = self.G * np.exp(-1j * 2. * np.pi * freq * self.tau)
+        A[iidx][self.n2] = +1.0
+        A[iidx][self.n3] = -1.0 
+        A[iidx][iidx] = -G
+        A[iidx+1][self.n1] = +1.0
+        A[iidx+1][self.n4] = -1.0
+        A[self.n1][iidx] = +1.0
+        A[self.n4][iidx] = -1.0
+        A[self.n2][iidx+1] = +1.0
+        A[self.n3][iidx+1] = -1.0
+
     def __str__(self):
         return 'CCVS: {}\nNodes = {} -> {} and {}->{}\nG = {}\ndelay={}\n'.format(self.name, self.n1, self.n2, self.n3, self.n4, self.G, self.tau)
 

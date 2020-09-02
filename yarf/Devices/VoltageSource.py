@@ -12,7 +12,7 @@ class VoltageSource():
         self.phase = np.radians(float(phase))
 
     def get_num_vsources(self, analysis):
-            return 1
+        return 1
 
     def is_nonlinear(self):
         return False

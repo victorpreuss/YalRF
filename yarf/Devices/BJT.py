@@ -75,8 +75,8 @@ class BJT():
         self.adjusted_options = options.copy()
 
         # for the limiting scheme
-        self.Vbeold = 0
-        self.Vbcold = 0
+        self.Vbeold = 0.
+        self.Vbcold = 0.
 
     def get_num_vsources(self, analysis):
         return 0
@@ -255,10 +255,10 @@ class BJT():
         Re  = self.options['Re'] 
         Rb  = self.options['Rb'] 
 
-        Vb = x[B-1] if B > 0 else 0.0
-        Vc = x[C-1] if C > 0 else 0.0
-        Ve = x[E-1] if E > 0 else 0.0
-        Vs = x[S-1] if S > 0 else 0.0
+        Vb = x[B-1] if B > 0 else 0.
+        Vc = x[C-1] if C > 0 else 0.
+        Ve = x[E-1] if E > 0 else 0.
+        Vs = x[S-1] if S > 0 else 0.
         Vbe = Vb - Ve
         Vbc = Vb - Vc
         Vsc = Vs - Vc

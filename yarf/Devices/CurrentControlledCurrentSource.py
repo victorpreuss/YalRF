@@ -20,10 +20,19 @@ class CurrentControlledCurrentSource():
 
     def add_dc_stamps(self, A, z, x, iidx):
         A[iidx][self.n1] = +1.0
-        A[iidx][self.n4] = -1.0 
+        A[iidx][self.n4] = -1.0
         A[self.n1][iidx] = +1.0
         A[self.n2][iidx] = +self.G
         A[self.n3][iidx] = -self.G
+        A[self.n4][iidx] = -1.0
+
+    def add_ac_stamps(self, A, z, x, iidx, freq):
+        G = self.G * np.exp(-1j * 2. * np.pi * freq * self.tau)
+        A[iidx][self.n1] = +1.0
+        A[iidx][self.n4] = -1.0
+        A[self.n1][iidx] = +1.0
+        A[self.n2][iidx] = +G
+        A[self.n3][iidx] = -G
         A[self.n4][iidx] = -1.0
 
     def __str__(self):
