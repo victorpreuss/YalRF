@@ -70,7 +70,7 @@ class Yarf():
 
     def add_dc_analysis(self, name, nodeset=None):
         """
-        Create and add a DC analysis.
+        Create and add a DC analysis with an optional nodeset.
 
         Parameters
         ----------
@@ -388,6 +388,10 @@ class Yarf():
         """
         Add a voltage controlled voltage source to the netlist.
 
+        n1 o----- +   + -->--o n2
+                 Vin Vout
+        n4 o----- -   - -----o n3
+
         Parameters
         ----------
         name : str
@@ -423,6 +427,10 @@ class Yarf():
     def add_vccs(self, name, n1, n2, n3, n4, G, tau=0):
         """
         Add a voltage controlled current source to the netlist.
+
+        n1 o----- +   ---<--o n2
+                 Vin  | Iout
+        n4 o----- -   --->--o n3
 
         Parameters
         ----------
@@ -460,6 +468,10 @@ class Yarf():
         """
         Add a current controlled voltage source to the netlist.
 
+        n1 o--->--   + -->--o n2
+             Iin |  Vout
+        n4 o---<--   - -----o n3
+
         Parameters
         ----------
         name : str
@@ -495,6 +507,10 @@ class Yarf():
     def add_cccs(self, name, n1, n2, n3, n4, G, tau=0):
         """
         Add a current controlled current source to the netlist.
+
+        n1 o--->--   --<---o n2
+             Iin |   | Iout
+        n4 o---<--   -->---o n3
 
         Parameters
         ----------
@@ -533,8 +549,9 @@ class Yarf():
         Add a diode to the netlist.
 
         The instance of the added diode is returned for the user. A dictionary
-        containing all the parameters for the diode can be accessed and editted
-        before the simulation is ran, to configure the model.
+        containing all the parameters for the diode model can be accessed and
+        modified before the simulation is ran, to configure the model. Access
+        the file Devices/Diode.py for a list of available parameters.
 
         Parameters
         ----------
@@ -569,8 +586,9 @@ class Yarf():
         Add a BJT to the netlist.
 
         The instance of the added bjt is returned for the user. A dictionary
-        containing all the parameters for the bjt can be accessed and editted
-        before the simulation is ran, to configure the model.
+        containing all the parameters for the bjt model can be accessed and
+        modified before the simulation is ran, to configure the model. Access
+        the file Devices/BJT.py for the a list of available parameters.
 
         Parameters
         ----------
@@ -608,7 +626,8 @@ class Yarf():
 
     # TODO:
     # def add_mosfet(self, name, n1, n2, n3, n4='gnd'):
-    # def add_iprobe(self, name):
+    # def add_iprobe(self, name, n1, n2):
+    # def add_opamp(self, name, n1, n2, n3):
     # def add_transformer(self, name, n1, n2, n3, n4, T):
     # def add_subcircuit(self, name, yarf object):
     # def remove_device(self, name):

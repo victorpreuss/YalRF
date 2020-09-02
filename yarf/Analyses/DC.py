@@ -114,7 +114,7 @@ class DC():
                 logger.info('Finished DC analysis.')
                 return self.x
 
-        # TODO: implement more continuations/homotopy techniques here
+        # TODO: implement more continuation/homotopy techniques here
 
         logger.error('DC analysis failed to converge!')
         return None
