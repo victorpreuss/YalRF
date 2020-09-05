@@ -68,7 +68,7 @@ class Yarf():
             logger.warning('Analysis name \'{}\' already taken!'.format(name))
             return None
 
-    def add_dc_analysis(self, name, nodeset=None):
+    def add_dc_analysis(self, name):
         """
         Create and add a DC analysis with an optional nodeset.
 
@@ -76,8 +76,6 @@ class Yarf():
         ----------
         name : str
             Name for the analysis object.
-        nodeset : dict
-            Dictionary with node names and guesses for their initial condition.
 
         Returns
         -------
@@ -87,14 +85,14 @@ class Yarf():
 
         """
         if name not in self.analyses:
-            dc = DC(name, nodeset)
+            dc = DC(name)
             self.analyses[name] = dc
             return dc
         else:
             logger.warning('Analysis name \'{}\' already taken!'.format(name))
             return None
 
-    def run(self, name, x0=None):
+    def run(self, name, x0=None, nodeset=None):
         """
         Run analysis with the requested name using initial condition.
 
@@ -105,6 +103,8 @@ class Yarf():
         x0 : :class:`numpy.ndarray`
             DC solution to be used as initial condition or operating point for
             the analysis. Some analyses (such as DC) ignore this parameter.
+        nodeset : dict
+            Dictionary with node names and guesses for their initial condition.
 
         Returns
         -------
@@ -114,7 +114,7 @@ class Yarf():
 
         """
         if name in self.analyses:
-            sol = self.analyses[name].run(self, x0)
+            sol = self.analyses[name].run(self, x0, nodeset)
             return sol
         else:
             logger.warning('Unknown analysis name: {}!'.format(name))
@@ -348,7 +348,7 @@ class Yarf():
         n1 = self.add_node(n1)
         n2 = self.add_node(n2)
         
-        vsource = VoltageSource(name, n1, n2, vtype='both', dc, ac, phase)
+        vsource = VoltageSource(name, n1, n2, dc, ac, phase, vtype='both')
         self.devices.append(vsource)
         return vsource
 
@@ -380,7 +380,7 @@ class Yarf():
         n1 = self.add_node(n1)
         n2 = self.add_node(n2)
         
-        isource = CurrentSource(name, n1, n2, itype='both', dc, ac, phase)
+        isource = CurrentSource(name, n1, n2, dc, ac, phase, itype='both')
         self.devices.append(isource)
         return isource
 
