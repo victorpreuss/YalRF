@@ -1,8 +1,12 @@
 # Description
 
-YalRF is an open-source circuit simulator written in Python. The package contains an API for netlist description and to run analyses in the circuit. One goal of the project is to integrate YalRF with the scikit-rf / openEMS / SignalIntegrity packages to create a powerful open-source development environment for RF engineers.
+YalRF is an open-source circuit simulator written in Python. The package contains an API for netlist description and to run analyses in the circuit. The generated data can be easily processed using numpy and Jupyter Notebooks.
 
-Code example:
+The main goal of this project is to implement a stable and powerful multi-tone harmonic balance engine with support to autonomous circuits.
+
+Another will be to integrate YalRF with the scikit-rf / openEMS / SignalIntegrity packages to create a powerful open-source development environment for RF engineers.
+
+Example of usage:
 ```python
 from yalrf import YalRF
 
@@ -58,7 +62,7 @@ y.print_dc_currents('DC1')
 
 ## API and Code Related:
 - [ ] review log messages to see if the type make sense (info, warning, error)
-- [ ] need to add exception handling instead of all the if and elses (try and catch)
+- [ ] need to add exception handling instead of all the ifs and elses
 - [ ] send solve_linear and solve_dc_nonlinear to a Solver.py file so it can be reused
 - [ ] add check at the top of each YalRF.add_XX() to see if the device or analysis name already exists in the netlist
 - [ ] add a method to check if the netlist has at least one purposely placed gnd node
