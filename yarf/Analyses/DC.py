@@ -34,10 +34,9 @@ options['source_maxiter'] = 50
 
 class DC():
     
-    def __init__(self, name, nodeset=None):
+    def __init__(self, name):
         self.name = name
 
-        self.nodeset = nodeset
         self.x = None
         
         self.n = 0            # number of uniquely named nodes including 'gnd'
@@ -51,7 +50,7 @@ class DC():
     def get_dc_solution(self):
         return self.x
 
-    def run(self, y, x0=None):
+    def run(self, y, x0=None, nodeset=None):
         # get netlist parameters and data structures
         self.n = y.get_n()
         self.m = y.get_m('dc')
@@ -63,8 +62,8 @@ class DC():
         A = np.zeros((self.n+self.m, self.n+self.m))
         z = np.zeros((self.n+self.m, 1))
 
-        # TODO: create initial guess vector from nodeset (forget x0)
-        x0 = np.zeros((len(A)-1, 1)) if x0 is None else x0
+        if x0 is None: 
+            x0 = self.create_x0(nodeset)
 
         # some devices have initialization routines
         for dev in y.get_devices():
@@ -174,19 +173,27 @@ class DC():
             
             # check if currents converged
             iconverged = True
-            for i in range(self.n, len(dx)):
+            for i in range(self.n-1, len(dx)):
                 if np.abs(dx[i,0]) > reltol * np.abs(xk[i,0]) + iabstol:
                     iconverged = False
 
-            if vconverged and iconverged:
+            logger.debug('\nA:\n{}\nAnl:\n{}\nz:\n{}\nznl\n{}'.format(A, Anl, z, znl))
+            logger.debug('\nxk:\n{}\nx:\n{}'.format(xk, self.x))
+
+            # currently a minimum of 3 Newton-Raphson iterations is forced.
+            # when the limiting scheme of the devices is too severe, the
+            # algorithm may step very slowly towards the solution, which
+            # can be confused with convergence. 
+            # since this behavior is more commom at the first couple
+            # iterations, it is a good heuristic to force at least 3.
+            # changing 'reltol' will also work!
+            if vconverged and iconverged and k >= 2:
                 converged = True
             else:
                 xk = self.x
                 k = k + 1
 
-            logger.debug('A:\n{}\nAnl:\n{}\nz:\n{}\nznl\n{}'.format(A, Anl, z, znl))
-            logger.debug('xk:\n{}\nx:\n{}'.format(xk, self.x))
-
+        logger.debug('The solver took {} iterations.'.format(k+1))
         return converged
 
     def solve_dc_nonlinear_using_gmin_stepping(self, A, z, x0):
@@ -227,7 +234,6 @@ class DC():
                 if gmin > gmin_max:
                     converged = False
                     break
-            k = k + 1
 
         return converged
 
@@ -275,4 +281,30 @@ class DC():
             k = k + 1
 
         return converged
+
+    def create_x0(self, nodeset):
+        x0 = np.zeros((self.n+self.m-1, 1))
+        if nodeset is not None:
+            # TODO: create x0 vector from nodeset here
+            pass
+        else:
+            # TODO: add heuristics to help convergence here.
+            #       use information from the netlist to provide a better 
+            #       initial solution to the solver, instead of just zeros.
+            pass
+
+            # get the independent vsources and add to solution vector
+            # doesn't work very well when connected to a pn junction
+            # for dev in self.lin_devs:
+            #     if isinstance(dev, VoltageSource):
+            #         if dev.vtype == 'dc' or dev.vtype == 'both':
+            #             if dev.n1 == 0:
+            #                 x0[dev.n2-1] = -dev.dc
+            #             elif dev.n2 == 0:
+            #                 x0[dev.n1-1] = +dev.dc
+            #             else:
+            #                 x0[dev.n1-1] = +dev.dc / 2.
+            #                 x0[dev.n2-1] = -dev.dc / 2.
+        
+        return x0
 
