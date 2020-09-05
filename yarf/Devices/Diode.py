@@ -1,3 +1,4 @@
+from math import inf, isinf, isfinite
 from scipy.constants import k, e
 import numpy as np
 
@@ -15,9 +16,9 @@ options['Vj']  = 0.7     # junction potential
 options['Fc']  = 0.5     # forward-bias depletion capacitance coefficient
 options['Cp']  = 0.0     # linear capacitance
 options['Tt']  = 0.0     # transit time
-options['Bv']  = 1e15    # reverse breakdown voltage
+options['Bv']  = inf     # reverse breakdown voltage
 options['Ibv'] = 0.001   # current at reverse breakdown voltage
-options['Ikf'] = 1e12    # high-injection knee current
+options['Ikf'] = inf     # high-injection knee current
 options['Kf']  = 0.0     # flicker noise coefficient
 options['Af']  = 1.0     # flicker noise exponent
 options['Ffe'] = 1.0     # flicker noise frequency exponent
@@ -34,8 +35,7 @@ options['Tm2'] = 0.0     # M quadratic temperature coefficient
 options['Tnom'] = 300.0  # temperature at which parameters were extracted
 options['Area'] = 1.0    # diode area multiplier
 
-# TODO: reverse breakdown
-#       temperature dependence
+# TODO: temperature dependence
 #       area dependence
 #       series resistance (Rs)
 #       noise
@@ -63,6 +63,8 @@ class Diode():
         return True
 
     def init(self):
+        self.oppoint = {}
+        self.Vdold = 0.
         pass
 
     def add_dc_stamps(self, A, z, x, iidx):
@@ -130,30 +132,40 @@ class Diode():
         Isr = self.options['Isr']
         Nr = self.options['Nr']
         Ikf = self.options['Ikf']
+        Bv = self.options['Bv']
+        Ibv = self.options['Ibv']
         T = self.options['Temp']
         Vt = k * T / e
 
-        V1 = x[self.n1-1] if self.n1 > 0 else 0.
-        V2 = x[self.n2-1] if self.n2 > 0 else 0.
+        # get diode voltage
+        V1 = x[self.n1-1,0] if self.n1 > 0 else 0.
+        V2 = x[self.n2-1,0] if self.n2 > 0 else 0.
         Vd = V1 - V2
         Vd = self.limit_diode_voltage(Vd, Vt)
 
         # forward current
-        Idf = Is * np.expm1(Vd / (N * Vt))
-        gdf = Is / (N * Vt) * np.exp(Vd / (N * Vt))
+        Idf = Is * (exp_lim(Vd / (N * Vt)) - 1.)
+        gdf = Is / (N * Vt) * exp_lim(Vd / (N * Vt))
 
         # reverse current
-        Idr = Isr * np.expm1(Vd / (Nr * Vt))
-        gdr = Isr / (Nr * Vt) * np.exp(Vd / (Nr * Vt))
+        Idr = Isr * (exp_lim(Vd / (Nr * Vt)) - 1.)
+        gdr = Isr / (Nr * Vt) * exp_lim(Vd / (Nr * Vt))
 
         # high injection
-        if Ikf > 0.:
+        if isfinite(Ikf):
             Idf = Idf * np.sqrt(Ikf / (Ikf + Idf))
             gdf = gdf * (1. - 0.5 * Idf / (Ikf + Idf)) * np.sqrt(Ikf / (Ikf + Idf))
 
+        # reverse breakdown
+        Ibr = 0.
+        gbr = 0.
+        if isfinite(Bv):
+            Ibr = Ibv * exp_lim(- Bv / Vt) * (1. - exp_lim(- Vd / Vt))
+            gbr = Ibv / Vt * exp_lim(- (Bv + Vd) / Vt)
+
         # diode total current
-        Id = Idf + Idr
-        gd = gdf + gdr
+        Id = Idf + Idr + Ibr
+        gd = gdf + gdr + gbr
 
         self.oppoint['Vd'] = Vd
         self.oppoint['Id'] = Id
@@ -162,15 +174,25 @@ class Diode():
         self.oppoint['gdf'] = gdf
         self.oppoint['Idr'] = Idr
         self.oppoint['gdr'] = gdr
+        self.oppoint['Ibr'] = Ibr
+        self.oppoint['gbr'] = gbr
 
     def limit_diode_voltage(self, Vd, Vt):
         Is = self.options['Is']
         N = self.options['N']
 
-        # limiting algorithm to avoid overflow
-        Vcrit = N * Vt * np.log(N * Vt / (np.sqrt(2.) * Is))
-        if (Vd > 0. and Vd > Vcrit):
-            Vd = self.Vdold + N * Vt * np.log1p((Vd - self.Vdold) / (N * Vt))
+        # limiting schemes
+        # Vcrit = N * Vt * np.log(N * Vt / (np.sqrt(2.) * Is))
+        # if (Vd > 0. and Vd > Vcrit):
+        #     Vd = self.Vdold +  N * Vt * np.log1p((Vd - self.Vdold) / (N * Vt))
+
+        # if Vd > 10 * Vt:
+        #     if Vd > self.Vdold:
+        #         Vd = self.Vdold + 2 * Vt
+        #     else:
+        #         Vd = self.Vdold - 2 * Vt
+        
+        Vd = self.Vdold + 10. * N * Vt * np.tanh((Vd - self.Vdold) / (10. * N * Vt))
         self.Vdold = Vd
 
         return Vd
@@ -201,3 +223,7 @@ class Diode():
 
     def __str__(self):
         return 'Diode: {}\nNodes = {} -> {}\n'.format(self.name, self.n1, self.n2)
+
+# limit the maximum derivative of the exponential function
+def exp_lim(x):
+    return np.exp(x) if x < 70. else np.exp(70.) + np.exp(70.) * (x - 70.)
