@@ -4,8 +4,8 @@ import scipy.linalg
 import scipy.sparse
 import scipy.sparse.linalg
 
-from yarf.Devices import *
-from yarf.Utils import dc_logger as logger
+from yalrf.Devices import *
+from yalrf.Utils import dc_logger as logger
 
 options = dict()
 options['is_sparse'] = False

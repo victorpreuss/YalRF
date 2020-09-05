@@ -4,9 +4,9 @@ import matplotlib.pyplot as plt
 
 import setup
 from Xyce import getXyceData
-from yarf import Yarf
+from yalrf import YalRF
 
-y = Yarf("Circuit 3")
+y = YalRF("Circuit 3")
 
 y.add_resistor('R1', 'n2', 'n3', 1e3)
 y.add_resistor('R2', 'n1', 'n2', 3.3e3)
@@ -44,7 +44,7 @@ xyce = getXyceData('tests/data/circuit3.prn')
 
 # sweep of Vin DC voltage
 vsweep = np.arange(-10, 15, 1)
-v2_yarf = np.empty(len(vsweep))
+v2_yalrf = np.empty(len(vsweep))
 v2_xyce = np.empty(len(vsweep))
 i = 0
 for v in vsweep:
@@ -58,17 +58,17 @@ for v in vsweep:
     vn3 = y.get_voltage('DC1', 'n3')
     vn4 = y.get_voltage('DC1', 'n4')
 
-    # compare outputs from Xyce and Yarf
-    v2_yarf[i] = vn2
+    # compare outputs from Xyce and YalRF
+    v2_yalrf[i] = vn2
     v2_xyce[i] = xyce[1][i][2]
     i = i + 1
 
-print(v2_yarf)
-plt.plot(vsweep, v2_yarf)
+print(v2_yalrf)
+plt.plot(vsweep, v2_yalrf)
 plt.plot(vsweep, v2_xyce)
 plt.title('Diode Clipper')
 plt.grid()
-plt.legend(['Yarf','Xyce'])
+plt.legend(['YalRF','Xyce'])
 plt.xlabel('Vsweep')
 plt.ylabel('Vclipped')
 plt.show()

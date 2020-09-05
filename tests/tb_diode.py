@@ -2,9 +2,9 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 import setup
-from yarf import Yarf
+from yalrf import v2_yalrf
 
-y = Yarf('Diode Testbench')
+y = v2_yalrf('Diode Testbench')
 
 i1 = y.add_vdc('I1', 'n1', 'gnd', 0.3)
 #y.add_resistor('R1', 'n1', 'n2', 1e3)

@@ -2,9 +2,9 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 import setup
-from yarf import Yarf
+from yalrf import YalRF
 
-y = Yarf('BJT AC Testbench')
+y = YalRF('BJT AC Testbench')
 
 v1 = y.add_vdc('V1', 'nc', 'gnd', 1)
 

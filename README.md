@@ -1,12 +1,12 @@
 # Description
 
-Yarf is an open-source circuit simulator written in Python. The package contains an API for netlist description and to run analyses in the circuit. One goal of the project is to integrate Yarf with the scikit-rf / openEMS / SignalIntegrity packages to create a powerful open-source development environment for RF engineers.
+YalRF is an open-source circuit simulator written in Python. The package contains an API for netlist description and to run analyses in the circuit. One goal of the project is to integrate YalRF with the scikit-rf / openEMS / SignalIntegrity packages to create a powerful open-source development environment for RF engineers.
 
 Code example:
 ```python
-from yarf import Yarf
+from yalrf import YalRF
 
-y = Yarf('Voltage Divider')
+y = YalRF('Voltage Divider')
 
 y.add_resistor('R1', 'n1', 'n2', 100)
 y.add_resistor('R2', 'n2', 'gnd', 25)
@@ -60,7 +60,7 @@ y.print_dc_currents('DC1')
 - [ ] review log messages to see if the type make sense (info, warning, error)
 - [ ] need to add exception handling instead of all the if and elses (try and catch)
 - [ ] send solve_linear and solve_dc_nonlinear to a Solver.py file so it can be reused
-- [ ] add check at the top of each Yarf.add_XX() to see if the device or analysis name already exists in the netlist
+- [ ] add check at the top of each YalRF.add_XX() to see if the device or analysis name already exists in the netlist
 - [ ] add a method to check if the netlist has at least one purposely placed gnd node
 - [ ] add subcircuit support
 - [ ] add a remove method for devices and analyses

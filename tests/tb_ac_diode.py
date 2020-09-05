@@ -2,9 +2,9 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 import setup
-from yarf import Yarf
+from yalrf import YalRF
 
-y = Yarf("Hello World!")
+y = YalRF("Hello World!")
 
 y.add_vsource('V1', 'n1', 'gnd', dc=0, ac=1)
 y.add_resistor('R1', 'n1', 'n2', 50.)

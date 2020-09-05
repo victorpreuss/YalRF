@@ -1,10 +1,10 @@
 from .Devices import *
 from .Analyses import *
-from .Utils import yarf_logger as logger
+from .Utils import yalrf_logger as logger
 
-class Yarf():
+class YalRF():
     """
-    Class containing the Yarf API for circuit simulation.
+    Class containing the YalRF API for circuit simulation.
     
     This class is initialized with only the circuit name. It contains methods to
     create and manipulate netlists, add analyses to be performed in the circuit,
@@ -629,7 +629,7 @@ class Yarf():
     # def add_iprobe(self, name, n1, n2):
     # def add_opamp(self, name, n1, n2, n3):
     # def add_transformer(self, name, n1, n2, n3, n4, T):
-    # def add_subcircuit(self, name, yarf object):
+    # def add_subcircuit(self, name, YalRF object):
     # def remove_device(self, name):
     # def remove_analysis(self, name):
 
