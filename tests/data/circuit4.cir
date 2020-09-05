@@ -1,0 +1,14 @@
+* BJT Curve Tracer
+IB 0 nb DC 1U
+VCE nc 0 DC 1
+Q1 nc nb 0 2N2222A
+
+.MODEL 2N2222A NPN(
+    + IS=8.11e-14 NF=1 NR=1 IKF=0.5
+    + IKR=0.225 VAF=113 VAR=24 ISE=1.06e-11
+    + NE=2  ISC=0 NC=2 BF=205 BR=4)
+
+.DC VCE 0 1 10e-3
+.STEP IB 10e-6 1010e-6 100e-6
+.PRINT DC file=circuit4.prn V(nb) V(nc) I(IB) I(VCE)
+.END
