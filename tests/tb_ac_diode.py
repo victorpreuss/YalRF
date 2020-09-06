@@ -12,6 +12,7 @@ y.add_inductor('L1', 'n2', 'n3', 1e-6)
 y.add_vdc('V2', 'n3', 'gnd', 0.75)
 d1 = y.add_diode('D1', 'n2', 'gnd')
 d1.options['Cj0'] = 1e-12
+d1.options['Rs'] = 1
 
 ac = y.add_ac_analysis('AC1', start=10e6, stop=10e9, numpts=300, sweeptype='logarithm')
 

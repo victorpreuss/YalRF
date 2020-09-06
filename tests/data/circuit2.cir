@@ -1,10 +1,10 @@
 * Diode IxV curve
 Vin n1 0 DC 1
 R1  n1 n2 1k
-D1  n2 0 D1N3940
+D1  n2 0 D1N3940 5
 
 .MODEL D1N3940 D(
-    + IS=4E-10 RS=0 N=1.48 TT=8E-7
+    + IS=4E-10 RS=500. N=1.48 TT=8E-7
     + CJO=1.95E-11 VJ=.4 M=.38 EG=1.36
     + XTI=-8 KF=0 AF=1 FC=.9
     + BV=600 IBV=1E-4)

@@ -48,7 +48,7 @@ class AC():
     def get_freqs(self):
         return self.freqs
 
-    def run(self, y, x0=None):
+    def run(self, y, x0=None, nodeset=None):
         # get netlist parameters and data structures
         self.n = y.get_n()
         self.m = y.get_m('ac')
@@ -58,7 +58,7 @@ class AC():
         # perform DC simulation if no operating point is provided
         if x0 is None:
             dc = DC(self.name + '.DC')
-            self.xdc = dc.run(y)
+            self.xdc = dc.run(y, nodeset=nodeset)
         else:
             self.xdc = x0
 

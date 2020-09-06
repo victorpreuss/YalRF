@@ -2,7 +2,7 @@ import numpy as np
 
 class VoltageSource():
     
-    def __init__(self, name, n1, n2, vtype=None, dc=0, ac=0, phase=0):
+    def __init__(self, name, n1, n2, dc=0, ac=0, phase=0, vtype=None):
         self.name = name
         self.n1 = n1
         self.n2 = n2

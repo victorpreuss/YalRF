@@ -36,8 +36,6 @@ options['Tnom'] = 300.0  # temperature at which parameters were extracted
 options['Area'] = 1.0    # diode area multiplier
 
 # TODO: temperature dependence
-#       area dependence
-#       series resistance (Rs)
 #       noise
 class Diode():
     
@@ -51,7 +49,7 @@ class Diode():
 
         # this options vector holds the corrected values
         # for the diode according to area and temperature
-        self.adjusted_options = options.copy()
+        self.adjusted_options = {}
 
         # for the limiting scheme
         self.Vdold = 0.
@@ -63,30 +61,38 @@ class Diode():
         return True
 
     def init(self):
+        # clear model internal variables
         self.oppoint = {}
         self.Vdold = 0.
-        pass
+        
+        # area and temperature dependent adjustments
+        A = self.options['Area']
+        self.adjusted_options['Is'] = self.options['Is'] * A
+        self.adjusted_options['Isr'] = self.options['Isr'] * A
+        self.adjusted_options['Ikf'] = self.options['Ikf'] * A
+        self.adjusted_options['Ibv'] = self.options['Ibv'] * A
+        self.adjusted_options['Cj0'] = self.options['Cj0'] * A
+        self.adjusted_options['Rs'] = self.options['Rs'] / A
 
     def add_dc_stamps(self, A, z, x, iidx):
         # calculate dc parameters
         self.calc_dc(x)
 
-        Vd = self.oppoint['Vd']
-        Id = self.oppoint['Id']
-        gd = self.oppoint['gd']
-        I = Id - gd * Vd
+        It = self.oppoint['It']
+        gt = self.oppoint['gt']
 
-        A[self.n1][self.n1] = A[self.n1][self.n1] + gd
-        A[self.n2][self.n2] = A[self.n2][self.n2] + gd
-        A[self.n1][self.n2] = A[self.n1][self.n2] - gd
-        A[self.n2][self.n1] = A[self.n2][self.n1] - gd
-        z[self.n1] = z[self.n1] - I
-        z[self.n2] = z[self.n2] + I
+        A[self.n1][self.n1] = A[self.n1][self.n1] + gt
+        A[self.n2][self.n2] = A[self.n2][self.n2] + gt
+        A[self.n1][self.n2] = A[self.n1][self.n2] - gt
+        A[self.n2][self.n1] = A[self.n2][self.n1] - gt
+        z[self.n1] = z[self.n1] - It
+        z[self.n2] = z[self.n2] + It
 
     def add_ac_stamps(self, A, z, x, iidx, freq):
         gd = self.oppoint['gd']
         Cd = self.oppoint['Cd']
-        y = gd + 1j * 2. * np.pi * freq * Cd
+        Rs = self.adjusted_options['Rs']
+        y = 1. / (Rs + 1. / (gd + 1j * 2. * np.pi * freq * Cd))
 
         A[self.n1][self.n1] = A[self.n1][self.n1] + y
         A[self.n2][self.n2] = A[self.n2][self.n2] + y
@@ -97,7 +103,7 @@ class Diode():
         self.init()
         self.calc_dc(x)
 
-        Cj0 = self.options['Cj0']
+        Cj0 = self.adjusted_options['Cj0']
         M = self.options['M']
         Vj = self.options['Vj']
         Fc = self.options['Fc']
@@ -127,20 +133,31 @@ class Diode():
         # Qd = Cp * Vd + Tt * Id + Qj
 
     def calc_dc(self, x):
-        Is = self.options['Is']
+        Is = self.adjusted_options['Is']
         N = self.options['N']
-        Isr = self.options['Isr']
+        Isr = self.adjusted_options['Isr']
         Nr = self.options['Nr']
-        Ikf = self.options['Ikf']
+        Ikf = self.adjusted_options['Ikf']
         Bv = self.options['Bv']
-        Ibv = self.options['Ibv']
+        Ibv = self.adjusted_options['Ibv']
+        Rs = self.adjusted_options['Rs']
         T = self.options['Temp']
         Vt = k * T / e
 
         # get diode voltage
         V1 = x[self.n1-1,0] if self.n1 > 0 else 0.
         V2 = x[self.n2-1,0] if self.n2 > 0 else 0.
-        Vd = V1 - V2
+
+        # remove voltage drop caused by series resistance
+        Vtot = V1 - V2
+        if 'It' in self.oppoint:
+            It = self.oppoint['It']
+            gt = self.oppoint['gt']
+            Id = It + gt * Vtot
+            Vd = Vtot - Id * Rs
+        else:
+            Vd = Vtot # ignore Rs effect at first iteration
+
         Vd = self.limit_diode_voltage(Vd, Vt)
 
         # forward current
@@ -167,9 +184,15 @@ class Diode():
         Id = Idf + Idr + Ibr
         gd = gdf + gdr + gbr
 
+        # add effect of series resistance
+        It = (Id - gd * Vd) / (1. + gd * Rs)
+        gt = gd / (1. + gd * Rs)
+
         self.oppoint['Vd'] = Vd
         self.oppoint['Id'] = Id
         self.oppoint['gd'] = gd
+        self.oppoint['It'] = It
+        self.oppoint['gt'] = gt
         self.oppoint['Idf'] = Idf
         self.oppoint['gdf'] = gdf
         self.oppoint['Idr'] = Idr
@@ -178,7 +201,7 @@ class Diode():
         self.oppoint['gbr'] = gbr
 
     def limit_diode_voltage(self, Vd, Vt):
-        Is = self.options['Is']
+        Is = self.adjusted_options['Is']
         N = self.options['N']
 
         # limiting schemes
@@ -199,7 +222,7 @@ class Diode():
 
     # Legacy: a simple exponential diode, used for initial experiments :-)
     def get_gd_and_Id_shockley(self, A, z, x, iidx):
-        Is = self.options['Is']
+        Is = self.adjusted_options['Is']
         N  = self.options['N']
         Vt = k * self.options['Temp'] / e
 
