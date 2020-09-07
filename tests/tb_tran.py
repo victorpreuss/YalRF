@@ -13,7 +13,7 @@ y.add_inductor('L1', 'n2', 'n3', 7.723e-9)
 c = y.add_capacitor('C2', 'n3', 'gnd', 7.014e-12)
 y.add_resistor('R2', 'n3', 'gnd', 50)
 
-tr1 = y.add_tran_analysis('TR1', 0, 2e-9, 5e-12)
+tr1 = y.add_tran_analysis('TR1', 2e-9, maxtstep=5e-12)
 #tr1.options['max_iterations'] = 500
 #tr1.options['reltol'] = 1e-6
 

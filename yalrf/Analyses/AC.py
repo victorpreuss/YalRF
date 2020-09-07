@@ -10,7 +10,7 @@ from yalrf.Analyses.Solver import solve_linear
 from yalrf.Utils import ac_logger as logger
 
 import logging
-logger.setLevel(logging.INFO)
+logger.setLevel(logging.WARNING)
 
 options = dict()
 options['is_sparse'] = False

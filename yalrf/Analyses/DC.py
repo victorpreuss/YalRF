@@ -5,7 +5,7 @@ from yalrf.Analyses.Solver import solve_linear#, solve_nonlinear
 from yalrf.Utils import dc_logger as logger
 
 import logging
-logger.setLevel(logging.INFO)
+logger.setLevel(logging.WARNING)
 
 options = dict()
 options['is_sparse'] = False

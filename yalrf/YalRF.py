@@ -2,6 +2,9 @@ from .Devices import *
 from .Analyses import *
 from .Utils import yalrf_logger as logger
 
+import logging
+logger.setLevel(logging.WARNING)
+
 class YalRF():
     """
     Class containing the YalRF API for circuit simulation.
@@ -449,7 +452,7 @@ class YalRF():
         vstep = TransientVoltageSource(name, n1, n2, dc, tstart, tstop, vtype='step')
         self.devices.append(vstep)
         return vstep
-        
+
     def add_vcvs(self, name, n1, n2, n3, n4, G, tau=0):
         """
         Add a voltage controlled voltage source to the netlist.

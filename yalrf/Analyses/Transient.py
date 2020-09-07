@@ -3,7 +3,7 @@ import numpy as np
 
 from yalrf.Devices import *
 from yalrf.Analyses import DC
-from yalrf.Analyses.Solver import solve_linear#, solve_nonlinear
+from yalrf.Analyses.Solver import solve_linear
 from yalrf.Utils import tr_logger as logger
 
 import logging
