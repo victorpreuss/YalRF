@@ -33,6 +33,39 @@ class YalRF():
         # analysis related attributes
         self.analyses = {}                  # list of analysis objects (DC, AC, Transient, ...)
 
+    def add_tran_analysis(self, name, tstart, tstop, maxtstep=None, uic=False):
+        """
+        Create and add a Transient analysis.
+
+        Parameters
+        ----------
+        name : str
+            Name for the analysis object.
+        tstart : float
+            Time to start saving simulation output data.
+        tstop : float
+            Stop time of the simulation.
+        maxtstep : float
+            Maximum timestep value.
+        uic : bool
+            Use provided initial conditions for capacitors and inductors
+            instead of calculating the DC bias point at the first step.
+
+        Returns
+        -------
+        :class:`Transient`
+            Reference to the created Transient object. This allows the user to change
+            internal parameters of the instance before running it.
+
+        """
+        if name not in self.analyses:
+            tran = Transient(name, tstart, tstop, maxtstep, uic)
+            self.analyses[name] = tran
+            return tran
+        else:
+            logger.warning('Analysis name \'{}\' already taken!'.format(name))
+            return None
+
     def add_ac_analysis(self, name, start, stop, numpts=10, stepsize=None, sweeptype='linear'):
         """
         Create and add an AC analysis.
@@ -102,7 +135,7 @@ class YalRF():
             Name for the analysis object to run.
         x0 : :class:`numpy.ndarray`
             DC solution to be used as initial condition or operating point for
-            the analysis. Some analyses (such as DC) ignore this parameter.
+            the analysis. The DC analysis use this as an initial guess.
         nodeset : dict
             Dictionary with node names and guesses for their initial condition.
 
@@ -384,6 +417,39 @@ class YalRF():
         self.devices.append(isource)
         return isource
 
+    def add_vstep(self, name, n1, n2, dc, tstart, tstop=1e6):
+        """
+        Add a voltage step source to the netlist. This source is used to apply
+        voltage steps at Transient simulations. It is 0V fot DC and AC analysis.
+
+        Parameters
+        ----------
+        name : str
+            Name of the device.
+        n1 : str
+            Positive node of the voltage source.
+        n2 : str
+            Negative node of the voltage source.
+        dc : float
+            DC voltage value in Volts.
+        tstart : float
+            Time at which the voltage step is applied.
+        tstop : float
+            Time at which the voltage step ends.
+
+        Returns
+        -------
+        :class:`TransientVoltageSource`
+            Reference to the created VoltageSource object.
+
+        """
+        n1 = self.add_node(n1)
+        n2 = self.add_node(n2)
+        
+        vstep = TransientVoltageSource(name, n1, n2, dc, tstart, tstop, vtype='step')
+        self.devices.append(vstep)
+        return vstep
+        
     def add_vcvs(self, name, n1, n2, n3, n4, G, tau=0):
         """
         Add a voltage controlled voltage source to the netlist.
@@ -870,13 +936,38 @@ class YalRF():
         """
         a = self.get_analysis(analysis)
         if isinstance(a, DC):
-            sol = a.get_dc_solution()[self.get_voltage_idx(node), 0]
-            return sol
+            v = a.get_dc_solution()[self.get_voltage_idx(node), 0]
+            return v
         elif isinstance(a, AC):
-            sol = a.get_ac_solution()[:, self.get_voltage_idx(node)]
-            return sol
+            v = a.get_ac_solution()[:, self.get_voltage_idx(node)]
+            return v
+        elif isinstance(a, Transient):
+            v = a.get_tran_solution()[:, self.get_voltage_idx(node)]
+            return v
         else:
             logger.warning('Unknown analysis type!')
+            return None
+
+    def get_time(self, analysis):
+        """
+        Return the simulated time array of a Transient analysis.
+
+        Parameters
+        ----------
+        analysis : str
+            Name of the analysis to get the time array from.
+        
+        Returns
+        -------
+        :class:`numpy.ndarray`
+            Time array.
+
+        """
+        a = self.get_analysis(analysis)
+        if isinstance(a, Transient):
+            return a.get_time()
+        else:
+            logger.warning('Analysis doesn\'t have a time array!')
             return None
 
     def get_freqs(self, analysis):
