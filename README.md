@@ -1,10 +1,10 @@
 # Description
 
-YalRF is an open-source circuit simulator written in Python. The package contains an API for netlist description and to run analyses in the circuit. The generated data can be easily processed using numpy and Jupyter Notebooks.
+YalRF is an open-source circuit simulator written in Python. The package contains an API for netlist description and circuit simulation. The generated data can be easily post-processed using numpy and Jupyter Notebooks.
 
 The main goal of this project is to implement a stable and powerful multi-tone harmonic balance engine with support to autonomous circuits.
 
-Another will be to integrate YalRF with the scikit-rf / openEMS / SignalIntegrity packages to create a powerful open-source development environment for RF engineers.
+Another goal will be to integrate YalRF with the scikit-rf / openEMS / SignalIntegrity packages to create a powerful open-source development environment for RF engineers.
 
 Example of usage:
 ```python
@@ -47,13 +47,13 @@ y.print_dc_currents('DC1')
 - [x] creation of MNA matrices using element stamps
 
 ## Modelling Related:
-- [ ] implement mosfet (level 3 model and maybe some bsim boy, see hspice doc)
+- [ ] implement mosfet
 - [ ] implement transformer
 - [ ] implement current probe
 - [ ] implement ideal operational amplifier
 - [ ] implement controlled switch (relay)
 - [ ] transmission lines
-- [ ] S-Parameter model (AC analysis and ChirpZ for transient)
+- [ ] S-Parameter block (AC analysis and ChirpZ for transient)
 - [ ] noise and temperature modelling
 - [x] add ac model of controlled sources
 - [x] AC models for AC analysis
@@ -62,13 +62,14 @@ y.print_dc_currents('DC1')
 
 ## API and Code Related:
 - [ ] review log messages to see if the type make sense (info, warning, error)
-- [ ] need to add exception handling instead of all the ifs and elses
+- [ ] exception handling instead of all the ifs and elses
 - [ ] send solve_linear and solve_dc_nonlinear to a Solver.py file so it can be reused
-- [ ] add check at the top of each YalRF.add_XX() to see if the device or analysis name already exists in the netlist
-- [ ] add a method to check if the netlist has at least one purposely placed gnd node
-- [ ] add subcircuit support
-- [ ] add a remove method for devices and analyses
-- [ ] make the netlist not case sensitive (? not sure)
+- [ ] check at the top of each YalRF.add_device() call if the device name already exists in the netlist
+- [ ] check if the netlist has at least one purposely placed gnd node
+- [ ] subcircuit support
+- [ ] remove method for devices and analyses in YalRF API
+- [ ] input sanitizaiton can be largely improved
+- [ ] there is a lot of waste in memory and performance that can be improved
 - [x] implement a test suite comparing the results with Xyce
 - [x] fix/differentiate dc and ac model for vsource and isource
 - [x] declare logger objects someplace else
