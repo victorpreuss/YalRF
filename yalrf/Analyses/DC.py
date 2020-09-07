@@ -1,18 +1,18 @@
 import numpy as np
 
-import scipy.linalg
-import scipy.sparse
-import scipy.sparse.linalg
-
 from yalrf.Devices import *
+from yalrf.Analyses.Solver import solve_linear#, solve_nonlinear
 from yalrf.Utils import dc_logger as logger
+
+import logging
+logger.setLevel(logging.INFO)
 
 options = dict()
 options['is_sparse'] = False
 options['max_iterations'] = 150
 options['gmin'] = 1e-12
 
-# convergence parametes
+# convergence parameters
 options['reltol'] = 1e-3
 options['vabstol'] = 1e-6
 options['iabstol'] = 1e-12
@@ -62,6 +62,7 @@ class DC():
         A = np.zeros((self.n+self.m, self.n+self.m))
         z = np.zeros((self.n+self.m, 1))
 
+        # create initial condition array if none is provided
         if x0 is None: 
             x0 = self.create_x0(nodeset)
 
@@ -85,7 +86,7 @@ class DC():
         # if there is not a nonlinear device, simply solve the linear system
         if not self.nonlin_devs:
             logger.info('Starting linear DC solver ...')
-            self.x, issolved = self.solve_linear(A[1:,1:], z[1:])
+            self.x, issolved = solve_linear(A[1:,1:], z[1:])
             if issolved:
                 logger.info('Finished DC analysis.')
                 return self.x
@@ -117,17 +118,6 @@ class DC():
 
         logger.error('DC analysis failed to converge!')
         return None
-    
-    def solve_linear(self, A, z, is_sparse=False):
-        if is_sparse == True:
-            An = scipy.sparse.csc_matrix(A)
-            lu = scipy.sparse.linalg.splu(An)
-            x = lu.solve(z)
-        else:
-            lu, piv = scipy.linalg.lu_factor(A)
-            x = scipy.linalg.lu_solve((lu, piv), z)
-
-        return x, not np.isnan(np.sum(x))
 
     def solve_dc_nonlinear(self, A, z, x0):
         # get the configuration parameters
@@ -157,7 +147,7 @@ class DC():
             zn = z[1:] + znl[1:]
 
             # solve linear system
-            self.x, issolved = self.solve_linear(An, zn, self.options['is_sparse'])
+            self.x, issolved = solve_linear(An, zn, self.options['is_sparse'])
 
             if not issolved:
                 logger.debug('Failed to resolve linear system! Solution has NaN ...')
@@ -180,14 +170,14 @@ class DC():
             logger.debug('\nA:\n{}\nAnl:\n{}\nz:\n{}\nznl\n{}'.format(A, Anl, z, znl))
             logger.debug('\nxk:\n{}\nx:\n{}'.format(xk, self.x))
 
-            # currently a minimum of 3 Newton-Raphson iterations is forced.
+            # currently a minimum of 2 Newton-Raphson iterations is forced.
             # when the limiting scheme of the devices is too severe, the
             # algorithm may step very slowly towards the solution, which
             # can be confused with convergence. 
             # since this behavior is more commom at the first couple
-            # iterations, it is a good heuristic to force at least 3.
+            # iterations, it is a good heuristic to force at least 2.
             # changing 'reltol' will also work!
-            if vconverged and iconverged and k >= 2:
+            if vconverged and iconverged and k >= 1:
                 converged = True
             else:
                 xk = self.x
