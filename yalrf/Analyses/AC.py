@@ -6,14 +6,18 @@ import scipy.sparse.linalg
 
 from yalrf.Devices import *
 from yalrf.Analyses import DC
+from yalrf.Analyses.Solver import solve_linear
 from yalrf.Utils import ac_logger as logger
+
+import logging
+logger.setLevel(logging.INFO)
 
 options = dict()
 options['is_sparse'] = False
 options['max_iterations'] = 150
 options['gmin'] = 1e-12
 
-# convergence parametes
+# convergence parameters
 options['reltol'] = 1e-3
 options['vabstol'] = 1e-6
 options['iabstol'] = 1e-12
@@ -23,9 +27,11 @@ class AC():
     def __init__(self, name, start, stop, numpts=10, stepsize=None, sweeptype='linear'):
         self.name = name
 
-        self.xac = None # list of complex solutions
+        # output data
+        self.xac = None
         self.xdc = None
 
+        # analysis parameters
         self.start = start
         self.stop = stop
         self.numpts = numpts
@@ -62,8 +68,9 @@ class AC():
         else:
             self.xdc = x0
 
-        # calculate the operating point of nonlinear devices
+        # initialize devices and calculate the operating point of nonlinear elements
         for dev in self.devs:
+            dev.init()
             if dev.is_nonlinear():
                 dev.calc_oppoint(self.xdc)
 
@@ -95,7 +102,7 @@ class AC():
             A = A + np.eye(len(A)) * self.options['gmin']
 
             # solve complex linear system
-            xac, issolved = self.solve_linear(A[1:,1:], z[1:], self.options['is_sparse'])
+            xac, issolved = solve_linear(A[1:,1:], z[1:], self.options['is_sparse'])
 
             # linear system is solved: add the solution to output
             # otherwise: add zeroes as solution and issue error log
@@ -111,21 +118,10 @@ class AC():
         logger.info('Finished AC analysis.')
         return self.xac
 
-    def solve_linear(self, A, z, is_sparse=False):
-        if is_sparse == True:
-            An = scipy.sparse.csc_matrix(A)
-            lu = scipy.sparse.linalg.splu(An)
-            x = lu.solve(z)
-        else:
-            lu, piv = scipy.linalg.lu_factor(A)
-            x = scipy.linalg.lu_solve((lu, piv), z)
-
-        return x, not np.isnan(np.sum(x))
-
     def create_freqs_array(self):
         if self.sweeptype == 'linear':
             if self.stepsize is not None:
-                self.freqs = np.arange(self.start, self.stop, self.step)
+                self.freqs = np.arange(self.start, self.stop, self.stepsize)
             else:
                 self.freqs = np.linspace(self.start, self.stop, self.numpts)
         elif self.sweeptype == 'logarithm':

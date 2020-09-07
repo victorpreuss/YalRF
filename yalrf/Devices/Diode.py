@@ -100,7 +100,6 @@ class Diode():
         A[self.n2][self.n1] = A[self.n2][self.n1] - y
 
     def calc_oppoint(self, x):
-        self.init()
         self.calc_dc(x)
 
         Cj0 = self.adjusted_options['Cj0']

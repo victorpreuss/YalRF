@@ -167,7 +167,6 @@ class BJT():
         A[S][S] = A[S][S] + Ycs
 
     def calc_oppoint(self, x):
-        self.init()
         self.calc_dc(x)
 
         Cje = self.options['Cje']
