@@ -10,5 +10,7 @@ from .VoltageControlledCurrentSource import VoltageControlledCurrentSource
 from .CurrentControlledVoltageSource import CurrentControlledVoltageSource
 from .CurrentControlledCurrentSource import CurrentControlledCurrentSource
 
+from .TransientVoltageSource import TransientVoltageSource
+
 from .Diode import Diode
 from .BJT import BJT
