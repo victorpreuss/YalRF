@@ -42,6 +42,9 @@ class VoltageSource():
         if self.vtype == 'dc':
             z[iidx] = 0
 
+    def add_tran_stamps(self, A, z, x, iidx, t, tstep):
+        self.add_dc_stamps(A, z, x, iidx)
+
     def __str__(self):
         return 'Voltage Source: {}\nNodes: {} -> {}\nVdc = {}\nVac = {}\nPhase = {}'.format(self.name,
                                                                                             self.n1,

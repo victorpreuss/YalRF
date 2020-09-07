@@ -25,5 +25,8 @@ class Resistor():
     def add_ac_stamps(self, A, z, x, iidx, freq):
         self.add_dc_stamps(A, z, x, iidx)
 
+    def add_tran_stamps(self, A, z, x, iidx, t, tstep):
+        self.add_dc_stamps(A, z, x, iidx)
+
     def __str__(self):
         return 'Resistor: {}\nNodes = {} -> {}\nValue = {}\n'.format(self.name, self.n1, self.n2, self.R)
