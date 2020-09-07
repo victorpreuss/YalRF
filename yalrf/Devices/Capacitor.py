@@ -10,7 +10,10 @@ class Capacitor():
 
         self.I = [] # list of accepted computed currents during transient
 
-    def get_I(self):
+    def get_idc(self, x):
+        return 0.
+
+    def get_itran(self, x):
         return np.array(self.I)
 
     def get_num_vsources(self, analysis):

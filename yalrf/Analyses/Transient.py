@@ -24,7 +24,7 @@ options['mintstep'] = 1e-16
 
 class Transient():
 
-    def __init__(self, name, tstart, tstop, maxtstep=None, uic=False):
+    def __init__(self, name, tstop, maxtstep=None, tstart=0, uic=False):
         self.name = name
 
         # output data
@@ -57,7 +57,7 @@ class Transient():
         self.iidx = y.get_mna_extra_rows_dict('tran')
 
         # create MNA matrices
-        A = np.zeros((self.n+self.m, self.n+self.m)) 
+        A = np.zeros((self.n+self.m, self.n+self.m))
         z = np.zeros((self.n+self.m, 1))
 
         # perform DC simulation if no initial point is provided

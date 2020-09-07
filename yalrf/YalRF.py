@@ -36,7 +36,7 @@ class YalRF():
         # analysis related attributes
         self.analyses = {}                  # list of analysis objects (DC, AC, Transient, ...)
 
-    def add_tran_analysis(self, name, tstart, tstop, maxtstep=None, uic=False):
+    def add_tran_analysis(self, name, tstop, maxtstep=None, tstart=0, uic=False):
         """
         Create and add a Transient analysis.
 
@@ -44,12 +44,12 @@ class YalRF():
         ----------
         name : str
             Name for the analysis object.
-        tstart : float
-            Time to start saving simulation output data.
         tstop : float
             Stop time of the simulation.
         maxtstep : float
             Maximum timestep value.
+        tstart : float
+            Time to start saving simulation output data.
         uic : bool
             Use provided initial conditions for capacitors and inductors
             instead of calculating the DC bias point at the first step.
@@ -62,7 +62,7 @@ class YalRF():
 
         """
         if name not in self.analyses:
-            tran = Transient(name, tstart, tstop, maxtstep, uic)
+            tran = Transient(name, tstop, maxtstep, tstart, uic)
             self.analyses[name] = tran
             return tran
         else:
@@ -933,7 +933,7 @@ class YalRF():
 
         Returns
         -------
-        :class:`numpy.ndarray`
+        :class:`numpy.ndarray` or float
             Voltage result for a determined node and analysis.
 
         """
@@ -949,6 +949,32 @@ class YalRF():
             return v
         else:
             logger.warning('Unknown analysis type!')
+            return None
+
+    def get_idc(self, analysis, device):
+        a = self.get_analysis(analysis)
+        dev = self.get_device(device)
+        if dev in a.iidx:
+            i = a.get_dc_solution()[a.iidx[dev]-1, 0]
+            return i
+        else:
+            x = a.get_dc_solution()
+            i = dev.get_idc(x)
+            return i
+
+    def get_itran(self, analysis, device):
+        a = self.get_analysis(analysis)
+        dev = self.get_device(device)
+        if isinstance(a, Transient):
+            if dev in a.iidx:
+                i = a.get_tran_solution()[:, a.iidx[dev]-1, 0]
+                return i
+            else:
+                x = a.get_tran_solution()
+                i = dev.get_itran(x)
+                return i
+        else:
+            logger.warning('Not a transient simulation!')
             return None
 
     def get_time(self, analysis):
