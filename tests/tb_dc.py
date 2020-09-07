@@ -1,7 +1,7 @@
 import setup
-from yalrf import v2_yalrf
+from yalrf import YalRF
 
-y = v2_yalrf("Hello World!")
+y = YalRF("Hello World!")
 
 y.add_resistor('R1', 'n1', 'n2', 100)
 y.add_resistor('R2', 'n2', 'gnd', 25)
