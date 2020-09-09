@@ -420,10 +420,10 @@ class YalRF():
         self.devices.append(isource)
         return isource
 
-    def add_vstep(self, name, n1, n2, dc, tstart, tstop=1e6):
+    def add_vpulse(self, name, n1, n2, v1, v2, tstart, tstop=1e9, trise=1e-12, tfall=1e-12):
         """
-        Add a voltage step source to the netlist. This source is used to apply
-        voltage steps at Transient simulations. It is 0V fot DC and AC analysis.
+        Add a pulse voltage source to the netlist. This source is used to apply
+        voltage ramps at Transient simulations. It is 0 V for DC and AC analyses.
 
         Parameters
         ----------
@@ -433,12 +433,18 @@ class YalRF():
             Positive node of the voltage source.
         n2 : str
             Negative node of the voltage source.
-        dc : float
-            DC voltage value in Volts.
+        v1 : float
+            Voltage level before tstart and after tstop.
+        v2 : float
+            Voltage level between tstart and tstop.
         tstart : float
             Time at which the voltage step is applied.
         tstop : float
             Time at which the voltage step ends.
+        trise : float
+            Rise time of the ramp at tstart.
+        tfall : float
+            Fall time of the ramp at tstop.
 
         Returns
         -------
@@ -449,9 +455,44 @@ class YalRF():
         n1 = self.add_node(n1)
         n2 = self.add_node(n2)
         
-        vstep = TransientVoltageSource(name, n1, n2, dc, tstart, tstop, vtype='step')
-        self.devices.append(vstep)
-        return vstep
+        vpulse = TransientVoltageSource(name, n1, n2, vtype='pulse', v1=v1, v2=v2, tstart=tstart, tstop=tstop, trise=trise, tfall=tfall)
+        self.devices.append(vpulse)
+        return vpulse
+
+    def add_vsine(self, name, n1, n2, dc, ac, freq, phase=0):
+        """
+        Add a sinusoidal voltage source to the netlist. This source is used to apply
+        sine waves at Transient simulations. It is 'dc' V for DC and 'ac' V for AC analyses.
+
+        Parameters
+        ----------
+        name : str
+            Name of the device.
+        n1 : str
+            Positive node of the voltage source.
+        n2 : str
+            Negative node of the voltage source.
+        dc : float
+            DC offset of the sine wave. Also used for DC bias point analysis.
+        ac : float
+            AC amplitude of the sine wave. Also used for AC analysis.
+        freq : float
+            Frequency of the sine wave at Transient analysis.
+        phase : float
+            Initial phase of the sine wave.
+
+        Returns
+        -------
+        :class:`TransientVoltageSource`
+            Reference to the created VoltageSource object.
+
+        """
+        n1 = self.add_node(n1)
+        n2 = self.add_node(n2)
+        
+        vsine = TransientVoltageSource(name, n1, n2, vtype='sine', dc=dc, ac=ac, freq=freq, phase=phase)
+        self.devices.append(vsine)
+        return vsine
 
     def add_vcvs(self, name, n1, n2, n3, n4, G, tau=0):
         """
