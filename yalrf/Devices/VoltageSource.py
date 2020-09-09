@@ -42,7 +42,7 @@ class VoltageSource():
         if self.vtype == 'dc':
             z[iidx] = 0
 
-    def add_tran_stamps(self, A, z, x, iidx, t, tstep):
+    def add_tran_stamps(self, A, z, x, iidx, xt, t, tstep):
         self.add_dc_stamps(A, z, x, iidx)
 
     def __str__(self):

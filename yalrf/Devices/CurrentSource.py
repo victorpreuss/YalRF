@@ -30,7 +30,7 @@ class CurrentSource():
             z[self.n1] = z[self.n1] + self.ac * np.exp(1j * self.phase)
             z[self.n2] = z[self.n2] - self.ac * np.exp(1j * self.phase)
 
-    def add_tran_stamps(self, A, z, x, iidx, t, tstep):
+    def add_tran_stamps(self, A, z, x, iidx, xt, t, tstep):
         self.add_dc_stamps(A, z, x, iidx)
 
     def __str__(self):

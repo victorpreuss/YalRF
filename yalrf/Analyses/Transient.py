@@ -105,7 +105,7 @@ class Transient():
                 # add transient stamps to MNA
                 for dev in self.devs:
                     idx = self.iidx[dev] if dev in self.iidx else None
-                    dev.add_tran_stamps(A, z, xtran, idx, t, tstep)
+                    dev.add_tran_stamps(A, z, xk, idx, xtran, t, tstep)
 
                 # solve linear system
                 x, issolved = solve_linear(A[1:,1:], z[1:])
@@ -165,7 +165,7 @@ class Transient():
 
                 if tstep < mintstep:
                     logger.error('Timestep: {} is below the minimum allowed!'.format(tstep))
-                    sys.exit(1)
+                    break
 
         # transform outputs into numpy array
         self.xtran = np.stack(xtran, axis=0)

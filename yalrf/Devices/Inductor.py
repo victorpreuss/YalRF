@@ -32,12 +32,12 @@ class Inductor():
         A[iidx][self.n2] = -y
         A[iidx][iidx] = -1.0
 
-    def add_tran_stamps(self, A, z, x, iidx, t, tstep):
+    def add_tran_stamps(self, A, z, x, iidx, xt, t, tstep):
         # get inductor voltage and current
-        V1 = x[-1][self.n1-1] if self.n1 > 0 else 0.
-        V2 = x[-1][self.n2-1] if self.n2 > 0 else 0.
+        V1 = xt[-1][self.n1-1] if self.n1 > 0 else 0.
+        V2 = xt[-1][self.n2-1] if self.n2 > 0 else 0.
         Vn = V1 - V2
-        In = x[-1][iidx-1]
+        In = xt[-1][iidx-1]
 
         # calculate companion model parameters
 

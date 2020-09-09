@@ -36,9 +36,9 @@ class Capacitor():
         A[self.n1][self.n2] = A[self.n1][self.n2] - y
         A[self.n2][self.n1] = A[self.n2][self.n1] - y
 
-    def add_tran_stamps(self, A, z, x, iidx, t, tstep):
+    def add_tran_stamps(self, A, z, x, iidx, xt, t, tstep):
         # get capacitor voltage and current
-        Vn = self.get_voltage(x[-1])
+        Vn = self.get_voltage(xt[-1])
         In = self.I[-1]
 
         # calculate companion model parameters
@@ -59,10 +59,10 @@ class Capacitor():
         z[self.n1] = z[self.n1] - Ieq
         z[self.n2] = z[self.n2] + Ieq
 
-    def store_current(self, x, tstep):
+    def store_current(self, xt, tstep):
         # get last capacitor voltages
-        Vnprev = self.get_voltage(x[-2])
-        Vn = self.get_voltage(x[-1])
+        Vnprev = self.get_voltage(xt[-2])
+        Vn = self.get_voltage(xt[-1])
 
         # calculate capacitor current for storage
         geq = (2. * self.C / tstep)

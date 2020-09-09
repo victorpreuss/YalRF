@@ -37,7 +37,7 @@ class Resistor():
     def add_ac_stamps(self, A, z, x, iidx, freq):
         self.add_dc_stamps(A, z, x, iidx)
 
-    def add_tran_stamps(self, A, z, x, iidx, t, tstep):
+    def add_tran_stamps(self, A, z, x, iidx, xt, t, tstep):
         self.add_dc_stamps(A, z, x, iidx)
 
     def get_tran_voltage(self, x):
