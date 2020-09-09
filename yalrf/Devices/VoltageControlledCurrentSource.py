@@ -31,6 +31,10 @@ class VoltageControlledCurrentSource():
         A[self.n3][self.n1] = A[self.n3][self.n1] - G
         A[self.n3][self.n4] = A[self.n3][self.n1] + G
 
+    # TODO: implement transient time delay
+    def add_tran_stamps(self, A, z, x, iidx, xt, t, tstep):
+        self.add_dc_stamps(A, z, x, iidx)
+
     def __str__(self):
         return 'VCCS: {}\nNodes = {} -> {} and {}->{}\nG = {}\ndelay={}\n'.format(self.name, self.n1, self.n2, self.n3, self.n4, self.G, self.tau)
 
