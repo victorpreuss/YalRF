@@ -54,7 +54,7 @@ class TransientVoltageSource():
         A[iidx][self.n2] = -1.0
 
         if self.vtype == 'sine':
-            z[iidx] = self.vac
+            z[iidx] = self.ac
         else:
             z[iidx] = 0.
 
