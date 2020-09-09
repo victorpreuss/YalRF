@@ -736,7 +736,7 @@ class YalRF():
 
     def add_opamp(self, name, n1, n2, n3, G=100e3, Vmax=10e3):
         """
-        Add an Operation Amplifier to the netlist.
+        Add an Operational Amplifier to the netlist.
 
         The instance of the added bjt is returned for the user. The opamp model
         is defined by a voltage gain and a maximum voltage for saturation.

@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 import setup
 from yalrf import YalRF
 
-y = YalRF('Bessel low-pass filter (fc = 1GHz)')
+y = YalRF('Simple inverting amplifier')
 
 y.add_vsine('V1', 'n1', 'gnd', dc=1, ac=1, freq=1e9, phase=0)
 y.add_opamp('OP1', 'gnd', 'n2', 'n3', G=100e3, Vmax=100)
