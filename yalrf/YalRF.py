@@ -698,7 +698,7 @@ class YalRF():
         The instance of the added bjt is returned for the user. A dictionary
         containing all the parameters for the bjt model can be accessed and
         modified before the simulation is ran, to configure the model. Access
-        the file Devices/BJT.py for the a list of available parameters.
+        the file Devices/BJT.py for a list of available parameters.
 
         Parameters
         ----------
@@ -734,10 +734,50 @@ class YalRF():
         self.devices.append(bjt)
         return bjt
 
+    def add_opamp(self, name, n1, n2, n3, G=100e3, Vmax=10e3):
+        """
+        Add an Operation Amplifier to the netlist.
+
+        The instance of the added bjt is returned for the user. The opamp model
+        is defined by a voltage gain and a maximum voltage for saturation.
+
+        Parameters
+        ----------
+        name : str
+            Name of the device.
+        n1 : str
+            Non-inverting input (+).
+        n2 : str
+            Inverting input (-).
+        n3: str
+            Output node.
+        G: float
+            Voltage gain of the opamp.
+        Vmax: float
+            Maximum voltage of the opamp. Above that, it saturates.
+
+        Returns
+        -------
+        :class:`Opamp`
+            Reference to the created Opamp object.
+
+        Examples
+        --------
+
+        >>> opamp1 = y.add_opamp('Q1', 'n1', 'n2', 'n3', G=100, Vmax=20)
+
+        """
+        n1 = self.add_node(n1)
+        n2 = self.add_node(n2)
+        n3 = self.add_node(n3)
+        
+        opamp = Opamp(name, n1, n2, n3, G, Vmax)
+        self.devices.append(opamp)
+        return opamp
+
     # TODO:
     # def add_mosfet(self, name, n1, n2, n3, n4='gnd'):
     # def add_iprobe(self, name, n1, n2):
-    # def add_opamp(self, name, n1, n2, n3):
     # def add_transformer(self, name, n1, n2, n3, n4, T):
     # def add_subcircuit(self, name, YalRF object):
     # def remove_device(self, name):

@@ -12,5 +12,6 @@ from .CurrentControlledCurrentSource import CurrentControlledCurrentSource
 
 from .TransientVoltageSource import TransientVoltageSource
 
+from .Opamp import Opamp
 from .Diode import Diode
 from .BJT import BJT

@@ -58,7 +58,7 @@ class TransientVoltageSource():
         else:
             z[iidx] = 0.
 
-    def add_tran_stamps(self, A, z, x, iidx, t, tstep):
+    def add_tran_stamps(self, A, z, x, iidx, xt, t, tstep):
         A[self.n1][iidx] = +1.0
         A[self.n2][iidx] = -1.0
         A[iidx][self.n1] = +1.0
