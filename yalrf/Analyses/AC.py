@@ -96,7 +96,7 @@ class AC():
             # populate the matrices A and z with the devices stamps
             for dev in self.devs:
                 idx = self.iidx[dev] if dev in self.iidx else None
-                dev.add_ac_stamps(A, z, self.xdc, idx, freq)
+                dev.add_ac_stamps(A, z, None, idx, freq)
 
             # adding gmin to all nodes
             A = A + np.eye(len(A)) * self.options['gmin']

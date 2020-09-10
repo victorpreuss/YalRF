@@ -11,6 +11,8 @@ class Opamp():
         self.G    = float(G)
         self.Vmax = float(Vmax)
 
+        self.oppoint = {}
+
     def get_num_vsources(self, analysis):
         return 1
 
@@ -18,12 +20,15 @@ class Opamp():
         return True
 
     def init(self):
-        pass
+        self.oppoint = {}
 
     def add_dc_stamps(self, A, z, x, iidx):
-        Vin, Vout = self.get_vdc(x)
-        g = self.G / (1. + np.square(np.pi / (2. * self.Vmax) * self.G * Vin))
-        Veq = g * Vin - self.Vmax * 2. / (np.pi) * np.arctan(np.pi / (2. * self.Vmax) * self.G * Vin)
+        # calculate dc parameters
+        self.calc_dc(x)
+
+        g = self.oppoint['g']
+        Veq = self.oppoint['Veq']
+
         A[iidx][self.n1] = +g
         A[iidx][self.n2] = -g
         A[self.n3][iidx] = +1.
@@ -31,7 +36,11 @@ class Opamp():
         z[iidx] = Veq
 
     def add_ac_stamps(self, A, z, x, iidx, freq):
-        self.add_dc_stamps(A, z, x, iidx)
+        g = self.oppoint['g']
+        A[iidx][self.n1] = +g
+        A[iidx][self.n2] = -g
+        A[self.n3][iidx] = +1.
+        A[iidx][self.n3] = -1.
 
     def add_tran_stamps(self, A, z, x, iidx, xt, t, tstep):
         self.add_dc_stamps(A, z, x, iidx)
@@ -43,8 +52,16 @@ class Opamp():
         Vout = x[self.n3-1] if self.n2 > 0 else 0.
         return Vin, Vout
 
+    def calc_dc(self, x):
+        Vin, Vout = self.get_vdc(x)
+        g = self.G / (1. + np.square(np.pi / (2. * self.Vmax) * self.G * Vin))
+        Veq = g * Vin - self.Vmax * 2. / np.pi * np.arctan(np.pi / (2. * self.Vmax) * self.G * Vin)
+
+        self.oppoint['g'] = g
+        self.oppoint['Veq'] = Veq
+
     def calc_oppoint(self, x):
-        pass
+        self.calc_dc(x)
 
     def __str__(self):
         return 'Opamp: {}\nNodes = {}, {}, {}\nValue = {}\n'.format(self.name, self.n1, self.n2, self.n3, self.G)
