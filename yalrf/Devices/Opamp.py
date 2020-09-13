@@ -45,13 +45,6 @@ class Opamp():
     def add_tran_stamps(self, A, z, x, iidx, xt, t, tstep):
         self.add_dc_stamps(A, z, x, iidx)
 
-    def get_vdc(self, x):
-        V1 = x[self.n1-1] if self.n1 > 0 else 0.
-        V2 = x[self.n2-1] if self.n2 > 0 else 0.
-        Vin = V1 - V2
-        Vout = x[self.n3-1] if self.n2 > 0 else 0.
-        return Vin, Vout
-
     def calc_dc(self, x):
         Vin, Vout = self.get_vdc(x)
         g = self.G / (1. + np.square(np.pi / (2. * self.Vmax) * self.G * Vin))
@@ -62,6 +55,16 @@ class Opamp():
 
     def calc_oppoint(self, x):
         self.calc_dc(x)
+
+    def save_oppoint(self):
+        pass
+
+    def get_vdc(self, x):
+        V1 = x[self.n1-1] if self.n1 > 0 else 0.
+        V2 = x[self.n2-1] if self.n2 > 0 else 0.
+        Vin = V1 - V2
+        Vout = x[self.n3-1] if self.n2 > 0 else 0.
+        return Vin, Vout
 
     def __str__(self):
         return 'Opamp: {}\nNodes = {}, {}, {}\nValue = {}\n'.format(self.name, self.n1, self.n2, self.n3, self.G)

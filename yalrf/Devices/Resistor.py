@@ -15,7 +15,7 @@ class Resistor():
         return V / self.R
 
     def get_itran(self, x):
-        V = self.get_tran_voltage(x)
+        V = self.get_tran_voltage(x)[:,0]
         return V / self.R
 
     def get_num_vsources(self, analysis):
@@ -41,8 +41,8 @@ class Resistor():
         self.add_dc_stamps(A, z, x, iidx)
 
     def get_tran_voltage(self, x):
-        V1 = x[:,self.n1-1,0] if self.n1 > 0 else np.zeros((len(x),1))
-        V2 = x[:,self.n2-1,0] if self.n2 > 0 else np.zeros((len(x),1))
+        V1 = x[:,self.n1-1] if self.n1 > 0 else np.zeros((len(x),1))
+        V2 = x[:,self.n2-1] if self.n2 > 0 else np.zeros((len(x),1))
         return (V1 - V2)
 
     def __str__(self):

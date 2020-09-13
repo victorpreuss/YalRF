@@ -67,11 +67,14 @@ class Transient():
         else:
             self.xdc = x0
 
-         # initialize devices and calculate the operating point of nonlinear elements
+         # initialize devices
         for dev in self.devs:
             dev.init()
+            # to initialize charge value in non-linear capacitances
             if dev.is_nonlinear():
                 dev.calc_oppoint(self.xdc)
+                print(dev.oppoint)
+                dev.save_oppoint()
 
         # Here we go!
         logger.info('Starting Transient analysis.')
@@ -85,14 +88,14 @@ class Transient():
 
         j = 0               # iterator
         t = 0.              # time variable
-        tstep = 1e-15       # time step
+        tstep = 1e-12       # time step
         xtran = [self.xdc]  # output data
         time  = [t]         # output time array
         while t < self.tstop:
             # increment time step
             t = t + tstep
 
-            # use last transient point as initial condition for solving the next
+            # use last transient point as initial condition for finding the next
             xk = xtran[-1]
 
             converged = False
@@ -101,6 +104,11 @@ class Transient():
                 # refresh matrices
                 A[:,:] = 0.0
                 z[:] = 0.0
+
+                # calculate nonlinear devices operating point at 'k' iteration
+                for dev in self.devs:
+                    if dev.is_nonlinear():
+                        dev.calc_oppoint(xk)
 
                 # add transient stamps to MNA
                 for dev in self.devs:
@@ -132,13 +140,13 @@ class Transient():
                 logger.debug('\nx:\n{}'.format(x[-1]))
 
                 # finish algorithm if simulation converged
-                if vconverged and iconverged and k >= 1:
+                if vconverged and iconverged and k >= 10:
                     converged = True
                 else:
                     xk = x
                     k = k + 1
 
-            logger.debug('The solver took {} iterations.'.format(k+1))
+            logger.info('The solver took {} iterations.'.format(k+1))
             logger.debug('j = ' + str(j) + '\ntstep = ' + str(tstep))
 
             if converged:
@@ -147,16 +155,20 @@ class Transient():
                 xtran.append(x)
                 j = j + 1
 
-                # save capacitor currents
+                # save data needed by elements with storage
                 for dev in self.devs:
-                    if isinstance(dev, Capacitor):
-                        dev.store_current(xtran, tstep)
+                    if isinstance(dev, Capacitor) or isinstance(dev, Diode):
+                        dev.save_tran(xtran, tstep)
 
                 # recalculate time step
                 if k < 5:
                     tstep = min(tstep * 2., self.maxtstep)
                 elif k > 10:
                     tstep = tstep / 2.
+
+                # DELETE
+                if j > 5:
+                    break
 
             else:
                 # reduce time step if NR failed to converge

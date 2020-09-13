@@ -54,16 +54,27 @@ class Diode():
         # for the limiting scheme
         self.Vdold = 0.
 
+        # store transient results for current and charge
+        self.Id = []
+        self.Ic = []
+        self.Q = []
+
     def get_num_vsources(self, analysis):
         return 0
 
     def is_nonlinear(self):
         return True
 
+    def get_itran(self, x):
+        return np.array(self.Id) + np.array(self.Ic)
+
     def init(self):
         # clear model internal variables
         self.oppoint = {}
         self.Vdold = 0.
+        self.Id = []
+        self.Ic = []
+        self.Q = []
         
         # area and temperature dependent adjustments
         A = self.options['Area']
@@ -78,8 +89,17 @@ class Diode():
         # calculate dc parameters
         self.calc_dc(x)
 
-        It = self.oppoint['It']
-        gt = self.oppoint['gt']
+        Vd = self.oppoint['Vd']
+        Id = self.oppoint['Id']
+        gd = self.oppoint['gd']
+        Rs = self.adjusted_options['Rs']
+
+        # add effect of series resistance
+        It = (Id - gd * Vd) / (1. + gd * Rs)
+        gt = gd / (1. + gd * Rs)
+
+        self.oppoint['It'] = It
+        self.oppoint['gt'] = gt
 
         A[self.n1][self.n1] = A[self.n1][self.n1] + gt
         A[self.n2][self.n2] = A[self.n2][self.n2] + gt
@@ -99,6 +119,66 @@ class Diode():
         A[self.n1][self.n2] = A[self.n1][self.n2] - y
         A[self.n2][self.n1] = A[self.n2][self.n1] - y
 
+    def add_tran_stamps(self, A, z, x, iidx, xt, t, tstep):
+        # results from previous transient iteration
+        In = self.Ic[-1]
+        Qn = self.Q[-1]
+
+        # results from previous newton iteration
+        Vnn = self.oppoint['Vd']
+        Cnn = self.oppoint['Cd']
+        Qnn = self.oppoint['Qd']
+
+        # trapezoidal
+        gc = 2. * Cnn / tstep
+        Ic = 2. * (Qnn - Qn - Cnn * Vnn) / tstep - In
+
+        # gd = self.oppoint['gd'] + gc
+        # Id = self.oppoint['Id'] + (Ic + gc * Vnn)
+        gd = self.oppoint['gd']
+        Id = self.oppoint['Id']
+
+        # add effect of series resistance
+        # Rs = self.adjusted_options['Rs']
+        # It = (Id - gd * Vnn) / (1. + gd * Rs)
+        # gt = gd / (1. + gd * Rs)
+        It = Id - gd * Vnn #+ Ic
+        gt = gd #+ gc
+
+        self.oppoint['Ic'] = Ic + gc * Vnn
+        self.oppoint['It'] = It
+        self.oppoint['gt'] = gt
+
+        # add to MNA
+        A[self.n1][self.n1] = A[self.n1][self.n1] + gt
+        A[self.n2][self.n2] = A[self.n2][self.n2] + gt
+        A[self.n1][self.n2] = A[self.n1][self.n2] - gt
+        A[self.n2][self.n1] = A[self.n2][self.n1] - gt
+        z[self.n1] = z[self.n1] - It
+        z[self.n2] = z[self.n2] + It
+
+    def save_oppoint(self):
+        # store operating point information needed for transient simulation
+        Idop = self.oppoint['Id']
+        Icop = 0.
+        Qop = self.oppoint['Qd']
+        self.Id.append(Idop)
+        self.Ic.append(Icop)
+        self.Q.append(Qop)
+
+    def save_tran(self, xt, tstep):
+        Qnn = self.oppoint['Qd']
+        Idnn = self.oppoint['Id']
+        Icnn = 2. * (Qnn - self.Q[-1]) / tstep
+        self.Q.append(Qnn)
+        self.Id.append(Idnn)
+        self.Ic.append(Icnn)
+
+    def get_voltage(self, x):
+        V1 = x[self.n1-1] if self.n1 > 0 else 0.
+        V2 = x[self.n2-1] if self.n2 > 0 else 0.
+        return (V1 - V2)
+
     def calc_oppoint(self, x):
         self.calc_dc(x)
 
@@ -109,27 +189,26 @@ class Diode():
         Cp = self.options['Cp']
         Tt = self.options['Tt']
         Vd = self.oppoint['Vd']
+        Id = self.oppoint['Id']
         gd = self.oppoint['gd']
 
         if Vd / Vj <= Fc:
             Cj = Cj0 * np.power((1. - Vd / Vj), -M)
+            Qj = Cj0 * Vj / (1. - M) * (1. - np.power((1. - Vd / Vj), (1. - M)))
         else:
             Cj = Cj0 / np.power((1. - Fc), M) * (1. + M * (Vd / Vj - Fc) / (1. - Fc))
+            Xd = (1. - np.power((1. - Fc), (1. - M))) / (1. - M) + \
+                 (1. - Fc * (1. + M)) / np.power((1. - Fc), (1. + M)) * (Vd / Vj - Fc) + \
+                 M / (2. * np.power((1. - Fc), (1. + M))) * (np.square(Vd / Vj) - np.square(Fc))
+            Qj = Cj0 * Vj * Xd
 
         Cd = Cp + Tt * gd + Cj
+        Qd = Cp * Vd + Tt * Id + Qj
 
         self.oppoint['Cd'] = Cd
         self.oppoint['Cj'] = Cj
         self.oppoint['Cdiff'] = Tt * gd
-
-        # if Vd / Vj <= Fc:
-        #     Qj = Cj0 * Vj / (1. - M) * (1. - np.power((1. - Vd / Vj), (1. - M)))
-        # else:
-        #     Xd = (1. - np.power((1. - Fc), (1. - M))) / (1. - M) + \
-        #          (1. - Fc * (1. + M)) / np.power((1. - Fc), (1. + M)) * (Vd / Vj - Fc) + \
-        #          M / (2. * np.power((1. - Fc), (1. + M))) * (np.square(Vd / Vj) - np.square(Fc))
-        #     Qj = Cj0 * Vj * Xd
-        # Qd = Cp * Vd + Tt * Id + Qj
+        self.oppoint['Qd'] = Qd
 
     def calc_dc(self, x):
         Is = self.adjusted_options['Is']
@@ -183,15 +262,9 @@ class Diode():
         Id = Idf + Idr + Ibr
         gd = gdf + gdr + gbr
 
-        # add effect of series resistance
-        It = (Id - gd * Vd) / (1. + gd * Rs)
-        gt = gd / (1. + gd * Rs)
-
         self.oppoint['Vd'] = Vd
         self.oppoint['Id'] = Id
         self.oppoint['gd'] = gd
-        self.oppoint['It'] = It
-        self.oppoint['gt'] = gt
         self.oppoint['Idf'] = Idf
         self.oppoint['gdf'] = gdf
         self.oppoint['Idr'] = Idr
@@ -204,9 +277,9 @@ class Diode():
         N = self.options['N']
 
         # limiting schemes
-        # Vcrit = N * Vt * np.log(N * Vt / (np.sqrt(2.) * Is))
-        # if (Vd > 0. and Vd > Vcrit):
-        #     Vd = self.Vdold +  N * Vt * np.log1p((Vd - self.Vdold) / (N * Vt))
+        Vcrit = N * Vt * np.log(N * Vt / (np.sqrt(2.) * Is))
+        if (Vd > 0. and Vd > Vcrit):
+            Vd = self.Vdold +  N * Vt * np.log1p((Vd - self.Vdold) / (N * Vt))
 
         # if Vd > 10 * Vt:
         #     if Vd > self.Vdold:
@@ -214,7 +287,7 @@ class Diode():
         #     else:
         #         Vd = self.Vdold - 2 * Vt
         
-        Vd = self.Vdold + 10. * N * Vt * np.tanh((Vd - self.Vdold) / (10. * N * Vt))
+        #Vd = self.Vdold + 10. * N * Vt * np.tanh((Vd - self.Vdold) / (10. * N * Vt))
         self.Vdold = Vd
 
         return Vd

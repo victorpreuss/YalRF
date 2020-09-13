@@ -5,7 +5,7 @@ from yalrf.Analyses.Solver import solve_linear#, solve_nonlinear
 from yalrf.Utils import dc_logger as logger
 
 import logging
-logger.setLevel(logging.WARNING)
+logger.setLevel(logging.INFO)
 
 options = dict()
 options['is_sparse'] = False
@@ -177,7 +177,7 @@ class DC():
             # since this behavior is more commom at the first couple
             # iterations, it is a good heuristic to force at least 2.
             # changing 'reltol' will also work!
-            if vconverged and iconverged and k >= 1:
+            if vconverged and iconverged and k >= 2:
                 converged = True
             else:
                 xk = self.x

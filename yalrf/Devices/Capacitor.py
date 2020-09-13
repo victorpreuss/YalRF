@@ -59,7 +59,7 @@ class Capacitor():
         z[self.n1] = z[self.n1] - Ieq
         z[self.n2] = z[self.n2] + Ieq
 
-    def store_current(self, xt, tstep):
+    def save_tran(self, xt, tstep):
         # get last capacitor voltages
         Vnprev = self.get_voltage(xt[-2])
         Vn = self.get_voltage(xt[-1])
