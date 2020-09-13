@@ -1,3 +1,3 @@
 import sys
 
-sys.path.append("../yalrf")
+sys.path.append("..")
