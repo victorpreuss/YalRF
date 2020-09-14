@@ -40,7 +40,7 @@ dc1 = y.add_dc_analysis('DC1')
 #dc1.options['reltol'] = 1e-6
 
 # get output from Xyce simulator
-xyce = getXyceData('tests/data/circuit3.prn')
+xyce = getXyceData('data/circuit3.prn')
 
 # sweep of Vin DC voltage
 vsweep = np.arange(-10, 15, 1)

@@ -124,26 +124,29 @@ class Diode():
         In = self.Ic[-1]
         Qn = self.Q[-1]
 
-        # results from previous newton iteration
+        # results from current newton iteration (solution candidate)
         Vnn = self.oppoint['Vd']
         Cnn = self.oppoint['Cd']
         Qnn = self.oppoint['Qd']
+
+        # implicit euler
+        # gc = Cnn / tstep
+        # Ic = (Qnn - Qn - Cnn * Vnn) / tstep
 
         # trapezoidal
         gc = 2. * Cnn / tstep
         Ic = 2. * (Qnn - Qn - Cnn * Vnn) / tstep - In
 
-        # gd = self.oppoint['gd'] + gc
-        # Id = self.oppoint['Id'] + (Ic + gc * Vnn)
+        # combine intrinsic diode and nonlinear capacitance
         gd = self.oppoint['gd']
         Id = self.oppoint['Id']
+        gt = gd + gc
+        It = Id + (Ic + gc * Vnn)
 
         # add effect of series resistance
-        # Rs = self.adjusted_options['Rs']
-        # It = (Id - gd * Vnn) / (1. + gd * Rs)
-        # gt = gd / (1. + gd * Rs)
-        It = Id - gd * Vnn #+ Ic
-        gt = gd #+ gc
+        Rs = self.adjusted_options['Rs']
+        It = (It - gt * Vnn) / (1. + gt * Rs)
+        gt = gt / (1. + gt * Rs)
 
         self.oppoint['Ic'] = Ic + gc * Vnn
         self.oppoint['It'] = It
@@ -159,17 +162,17 @@ class Diode():
 
     def save_oppoint(self):
         # store operating point information needed for transient simulation
+        Qop = self.oppoint['Qd']
         Idop = self.oppoint['Id']
         Icop = 0.
-        Qop = self.oppoint['Qd']
+        self.Q.append(Qop)
         self.Id.append(Idop)
         self.Ic.append(Icop)
-        self.Q.append(Qop)
 
     def save_tran(self, xt, tstep):
         Qnn = self.oppoint['Qd']
         Idnn = self.oppoint['Id']
-        Icnn = 2. * (Qnn - self.Q[-1]) / tstep
+        Icnn = self.oppoint['Ic']
         self.Q.append(Qnn)
         self.Id.append(Idnn)
         self.Ic.append(Icnn)

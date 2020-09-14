@@ -7,7 +7,7 @@ from yalrf.Analyses.Solver import solve_linear
 from yalrf.Utils import tr_logger as logger
 
 import logging
-logger.setLevel(logging.INFO)
+logger.setLevel(logging.WARNING)
 
 options = dict()
 options['is_sparse'] = False
@@ -136,18 +136,19 @@ class Transient():
                     if np.abs(dx[i,0]) > reltol * np.abs(xk[i,0]) + iabstol:
                         iconverged = False
 
-                logger.debug('\nA:\n{}\nz:\n{}\n'.format(A, z))
-                logger.debug('\nx:\n{}'.format(x[-1]))
+                # logger.debug('\nA:\n{}\nz:\n{}\n'.format(A, z))
+                # logger.debug('\nx:\n{}'.format(x[-1]))
 
                 # finish algorithm if simulation converged
-                if vconverged and iconverged and k >= 10:
+                if vconverged and iconverged and k >= 1:
                     converged = True
                 else:
                     xk = x
                     k = k + 1
 
-            logger.info('The solver took {} iterations.'.format(k+1))
-            logger.debug('j = ' + str(j) + '\ntstep = ' + str(tstep))
+            logger.debug('Current time: {} s'.format(t))
+            logger.debug('Timestep: {} s'.format(tstep))
+            logger.debug('The solver took {} iterations.'.format(k+1))
 
             if converged:
                 # save solution
@@ -163,12 +164,10 @@ class Transient():
                 # recalculate time step
                 if k < 5:
                     tstep = min(tstep * 2., self.maxtstep)
+                    logger.debug('Increasing timestep to: {} s'.format(tstep))
                 elif k > 10:
                     tstep = tstep / 2.
-
-                # DELETE
-                if j > 5:
-                    break
+                    logger.debug('Decreasing timestep to: {} s'.format(tstep))
 
             else:
                 # reduce time step if NR failed to converge
