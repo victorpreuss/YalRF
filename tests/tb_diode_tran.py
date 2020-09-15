@@ -21,7 +21,7 @@ d1.options['Cp'] = 1e-6
 d1.options['Cj0'] = 1.95e-11
 d1.options['Tt'] = 8e-7
 
-tr1 = y.add_tran_analysis('TR1', tstop=100e-3, maxtstep=1e-3)
+tr1 = y.add_tran_analysis('TR1', tstop=100e-3, maxtstep=100e-6)
 #tr1.options['max_iterations'] = 500
 #tr1.options['reltol'] = 1e-6
 
