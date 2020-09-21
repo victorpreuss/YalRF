@@ -59,6 +59,9 @@ class Opamp():
     def save_oppoint(self):
         pass
 
+    def save_tran(self, x, tstep):
+        pass
+
     def get_vdc(self, x):
         V1 = x[self.n1-1] if self.n1 > 0 else 0.
         V2 = x[self.n2-1] if self.n2 > 0 else 0.

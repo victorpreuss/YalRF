@@ -35,7 +35,8 @@ options['Tm2'] = 0.0     # M quadratic temperature coefficient
 options['Tnom'] = 300.0  # temperature at which parameters were extracted
 options['Area'] = 1.0    # diode area multiplier
 
-# TODO: temperature dependence
+# TODO: test nonlinear capacitance
+#       temperature dependence
 #       noise
 class Diode():
     
@@ -51,8 +52,10 @@ class Diode():
         # for the diode according to area and temperature
         self.adjusted_options = {}
 
-        # for the limiting scheme
-        self.Vdold = 0.
+        # store for next newton iteration
+        self.Vdold = 0. 
+        self.It = 0.
+        self.gt = 0.
 
         # store transient results for current and charge
         self.Id = []
@@ -65,13 +68,20 @@ class Diode():
     def is_nonlinear(self):
         return True
 
+    def get_idc(self, x):
+        return self.Id[0]
+
     def get_itran(self, x):
         return np.array(self.Id) + np.array(self.Ic)
 
     def init(self):
         # clear model internal variables
         self.oppoint = {}
+
         self.Vdold = 0.
+        self.It = 0.
+        self.gt = 0.
+
         self.Id = []
         self.Ic = []
         self.Q = []
@@ -95,18 +105,15 @@ class Diode():
         Rs = self.adjusted_options['Rs']
 
         # add effect of series resistance
-        It = (Id - gd * Vd) / (1. + gd * Rs)
-        gt = gd / (1. + gd * Rs)
+        self.It = (Id - gd * Vd) / (1. + gd * Rs)
+        self.gt = gd / (1. + gd * Rs)
 
-        self.oppoint['It'] = It
-        self.oppoint['gt'] = gt
-
-        A[self.n1][self.n1] = A[self.n1][self.n1] + gt
-        A[self.n2][self.n2] = A[self.n2][self.n2] + gt
-        A[self.n1][self.n2] = A[self.n1][self.n2] - gt
-        A[self.n2][self.n1] = A[self.n2][self.n1] - gt
-        z[self.n1] = z[self.n1] - It
-        z[self.n2] = z[self.n2] + It
+        A[self.n1][self.n1] = A[self.n1][self.n1] + self.gt
+        A[self.n2][self.n2] = A[self.n2][self.n2] + self.gt
+        A[self.n1][self.n2] = A[self.n1][self.n2] - self.gt
+        A[self.n2][self.n1] = A[self.n2][self.n1] - self.gt
+        z[self.n1] = z[self.n1] - self.It
+        z[self.n2] = z[self.n2] + self.It
 
     def add_ac_stamps(self, A, z, x, iidx, freq):
         gd = self.oppoint['gd']
@@ -145,37 +152,36 @@ class Diode():
 
         # add effect of series resistance
         Rs = self.adjusted_options['Rs']
-        It = (It - gt * Vnn) / (1. + gt * Rs)
-        gt = gt / (1. + gt * Rs)
+        self.It = (It - gt * Vnn) / (1. + gt * Rs)
+        self.gt = gt / (1. + gt * Rs)
 
-        self.oppoint['Ic'] = Ic + gc * Vnn
-        self.oppoint['It'] = It
-        self.oppoint['gt'] = gt
-
+        # store total capacitance current
+        self.Icnn = Ic + gc * Vnn
+        
         # add to MNA
-        A[self.n1][self.n1] = A[self.n1][self.n1] + gt
-        A[self.n2][self.n2] = A[self.n2][self.n2] + gt
-        A[self.n1][self.n2] = A[self.n1][self.n2] - gt
-        A[self.n2][self.n1] = A[self.n2][self.n1] - gt
-        z[self.n1] = z[self.n1] - It
-        z[self.n2] = z[self.n2] + It
+        A[self.n1][self.n1] = A[self.n1][self.n1] + self.gt
+        A[self.n2][self.n2] = A[self.n2][self.n2] + self.gt
+        A[self.n1][self.n2] = A[self.n1][self.n2] - self.gt
+        A[self.n2][self.n1] = A[self.n2][self.n1] - self.gt
+        z[self.n1] = z[self.n1] - self.It
+        z[self.n2] = z[self.n2] + self.It
 
     def save_oppoint(self):
         # store operating point information needed for transient simulation
         Qop = self.oppoint['Qd']
         Idop = self.oppoint['Id']
-        Icop = 0.
-        self.Q.append(Qop)
+
         self.Id.append(Idop)
-        self.Ic.append(Icop)
+        self.Ic.append(0.)
+        self.Q.append(Qop)
 
     def save_tran(self, xt, tstep):
         Qnn = self.oppoint['Qd']
         Idnn = self.oppoint['Id']
-        Icnn = self.oppoint['Ic']
+
         self.Q.append(Qnn)
         self.Id.append(Idnn)
-        self.Ic.append(Icnn)
+        self.Ic.append(self.Icnn)
 
     def get_voltage(self, x):
         V1 = x[self.n1-1] if self.n1 > 0 else 0.
@@ -231,13 +237,8 @@ class Diode():
 
         # remove voltage drop caused by series resistance
         Vtot = V1 - V2
-        if 'It' in self.oppoint:
-            It = self.oppoint['It']
-            gt = self.oppoint['gt']
-            Id = It + gt * Vtot
-            Vd = Vtot - Id * Rs
-        else:
-            Vd = Vtot # ignore Rs effect at first iteration
+        Id = self.It + self.gt * Vtot
+        Vd = Vtot - Id * Rs
 
         Vd = self.limit_diode_voltage(Vd, Vt)
 
@@ -275,6 +276,25 @@ class Diode():
         self.oppoint['Ibr'] = Ibr
         self.oppoint['gbr'] = gbr
 
+    def check_vlimit(self, x, vabstol):
+        T  = self.options['Temp']
+        Rs = self.adjusted_options['Rs']
+
+        Vt = k * T / e
+        V1 = x[self.n1-1,0] if self.n1 > 0 else 0.
+        V2 = x[self.n2-1,0] if self.n2 > 0 else 0.
+
+        Vtot = V1 - V2
+        Id = self.It + self.gt * Vtot
+        Vd = Vtot - Id * Rs
+
+        Vdlim = self.limit_diode_voltage(Vd, Vt)
+
+        if Vd - Vdlim > vabstol:
+            return False
+
+        return True
+
     def limit_diode_voltage(self, Vd, Vt):
         Is = self.adjusted_options['Is']
         N = self.options['N']
@@ -284,13 +304,7 @@ class Diode():
         if (Vd > 0. and Vd > Vcrit):
             Vd = self.Vdold +  N * Vt * np.log1p((Vd - self.Vdold) / (N * Vt))
 
-        # if Vd > 10 * Vt:
-        #     if Vd > self.Vdold:
-        #         Vd = self.Vdold + 2 * Vt
-        #     else:
-        #         Vd = self.Vdold - 2 * Vt
-        
-        #Vd = self.Vdold + 10. * N * Vt * np.tanh((Vd - self.Vdold) / (10. * N * Vt))
+        # Vd = self.Vdold + 10. * N * Vt * np.tanh((Vd - self.Vdold) / (10. * N * Vt))
         self.Vdold = Vd
 
         return Vd

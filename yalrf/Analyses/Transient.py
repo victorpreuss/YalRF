@@ -60,20 +60,19 @@ class Transient():
         A = np.zeros((self.n+self.m, self.n+self.m))
         z = np.zeros((self.n+self.m, 1))
 
-        # perform DC simulation if no initial point is provided
+        # perform DC simulation if no operating point is provided
         if x0 is None:
             dc = DC(self.name + '.DC')
             self.xdc = dc.run(y, nodeset=nodeset)
         else:
             self.xdc = x0
 
-         # initialize devices
+        # initialize devices
         for dev in self.devs:
             dev.init()
             # to initialize charge value in non-linear capacitances
             if dev.is_nonlinear():
                 dev.calc_oppoint(self.xdc)
-                print(dev.oppoint)
                 dev.save_oppoint()
 
         # Here we go!
@@ -136,11 +135,18 @@ class Transient():
                     if np.abs(dx[i,0]) > reltol * np.abs(xk[i,0]) + iabstol:
                         iconverged = False
 
+                # check if the limited voltages are consistent with the solution
+                vlimconverged = True
+                for dev in self.devs:
+                    if hasattr(dev, 'check_vlimit') and callable(dev.check_vlimit):
+                        if dev.check_vlimit(x, vabstol) == False:
+                            vlimconverged = False
+
                 # logger.debug('\nA:\n{}\nz:\n{}\n'.format(A, z))
                 # logger.debug('\nx:\n{}'.format(x[-1]))
 
                 # finish algorithm if simulation converged
-                if vconverged and iconverged and k >= 1:
+                if vconverged and iconverged and vlimconverged:
                     converged = True
                 else:
                     xk = x
@@ -158,7 +164,7 @@ class Transient():
 
                 # save data needed by elements with storage
                 for dev in self.devs:
-                    if isinstance(dev, Capacitor) or isinstance(dev, Diode):
+                    if hasattr(dev, 'save_tran') and callable(dev.save_tran):
                         dev.save_tran(xtran, tstep)
 
                 # recalculate time step
@@ -175,7 +181,7 @@ class Transient():
                 tstep = tstep / 10.
 
                 if tstep < mintstep:
-                    logger.error('Timestep: {} is below the minimum allowed!'.format(tstep))
+                    logger.error('Timestep: {} s is below the minimum allowed!'.format(tstep))
                     break
 
         # transform outputs into numpy array

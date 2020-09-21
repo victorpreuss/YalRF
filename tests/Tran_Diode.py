@@ -21,7 +21,7 @@ d1.options['Cp'] = 1e-6
 d1.options['Cj0'] = 1.95e-11
 d1.options['Tt'] = 8e-7
 
-tr1 = y.add_tran_analysis('TR1', tstop=100e-3, maxtstep=100e-6)
+tr1 = y.add_tran_analysis('TR1', tstop=100e-3, maxtstep=50e-6)
 #tr1.options['max_iterations'] = 500
 #tr1.options['reltol'] = 1e-6
 
@@ -36,12 +36,6 @@ vn2 = y.get_voltage('TR1', 'n2')
 ir1 = y.get_itran('TR1', 'R1')
 id1 = y.get_itran('TR1', 'D1')
 iv1 = y.get_itran('TR1', 'V1')
-
-#print(d1.Ic[:])
-# print(d1.Id[:])
-# print(vn1[:])
-# print(vn2[:])
-# print(iv1[:])
 
 plt.figure(figsize=(12,5))
 

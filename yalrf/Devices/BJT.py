@@ -55,7 +55,6 @@ options['Area'] = 1.0   # bjt area multiplier
 #       DC resistances Rb, Rc and Re
 #       excess phase (for transient?)
 #       temperature dependence
-#       area dependence
 #       Cbcxdep is currently unused
 #       noise
 class BJT():
@@ -72,11 +71,14 @@ class BJT():
 
         # this options vector holds the corrected values
         # for the BJT according to area and temperature
-        self.adjusted_options = options.copy()
+        self.adjusted_options = {}
 
         # for the limiting scheme
         self.Vbeold = 0.
         self.Vbcold = 0.
+
+        self.Ib = []
+        self.Ic = []
 
     def get_num_vsources(self, analysis):
         return 0
@@ -84,11 +86,44 @@ class BJT():
     def is_nonlinear(self):
         return True
 
+    def get_idc(self, x):
+        # TODO: only work for transient now
+        return self.Ib[0], self.Ic[0], self.Ib[0] + self.Ic[0]
+
+    def get_itran(self, x):
+        Ib = np.array(self.Ib)
+        Ic = np.array(self.Ic)
+        Ie = Ib + Ic
+        return Ib, Ic, Ie
+
     def init(self):
+        # clear model internal variables
         self.oppoint = {}
+
         self.Vbeold = 0.
         self.Vbcold = 0.
-        pass
+        self.Ib = []
+        self.Ic = []
+        
+        # area and temperature dependent adjustments
+        A = self.options['Area']
+
+        self.adjusted_options['Is'] = self.options['Is'] * A
+        self.adjusted_options['Ise'] = self.options['Ise'] * A
+        self.adjusted_options['Isc'] = self.options['Isc'] * A
+        self.adjusted_options['Ikf'] = self.options['Ikf'] * A
+        self.adjusted_options['Ikr'] = self.options['Ikr'] * A
+        self.adjusted_options['Irb'] = self.options['Irb'] * A
+        self.adjusted_options['Itf'] = self.options['Itf'] * A
+
+        self.adjusted_options['Cje'] = self.options['Cje'] * A
+        self.adjusted_options['Cjs'] = self.options['Cjs'] * A
+        self.adjusted_options['Cjc'] = self.options['Cjc'] * A
+
+        self.adjusted_options['Rb'] = self.options['Rb'] / A
+        self.adjusted_options['Rbm'] = self.options['Rbm'] / A
+        self.adjusted_options['Rc'] = self.options['Rc'] / A
+        self.adjusted_options['Re'] = self.options['Re'] / A
 
     def add_dc_stamps(self, A, z, x, iidx):
         # calculate dc parameters
@@ -109,17 +144,17 @@ class BJT():
 
         Ibeeq = Ibe - gpi * Vbe
         Ibceq = Ibc - gmu * Vbc
-        Iceeq = It  - gmf * Vbe + gmr * Vbc
+        Iceeq = It  - gmf * Vbe - gmr * Vbc
 
         # fill MNA matrices
         A[B][B] = A[B][B] + gmu + gpi
         A[B][C] = A[B][C] - gmu
         A[B][E] = A[B][E] - gpi
-        A[C][B] = A[C][B] - gmu + gmf - gmr
-        A[C][C] = A[C][C] + gmu + gmr
+        A[C][B] = A[C][B] - gmu + gmf + gmr
+        A[C][C] = A[C][C] + gmu - gmr
         A[C][E] = A[C][E] - gmf
-        A[E][B] = A[E][B] - gpi - gmf + gmr
-        A[E][C] = A[E][C] - gmr
+        A[E][B] = A[E][B] - gpi - gmf - gmr
+        A[E][C] = A[E][C] + gmr
         A[E][E] = A[E][E] + gpi + gmf
         z[B] = z[B] - Ibeeq - Ibceq
         z[C] = z[C] + Ibceq - Iceeq
@@ -166,16 +201,31 @@ class BJT():
         A[S][E] = A[S][E] + 0.
         A[S][S] = A[S][S] + Ycs
 
+    def add_tran_stamps(self, A, z, x, iidx, xt, t, tstep):
+        self.add_dc_stamps(A, z, x, iidx)
+
+    def save_oppoint(self):
+        Ib = self.oppoint['Ib']
+        Ic = self.oppoint['Ic']
+        self.Ib.append(Ib)
+        self.Ic.append(Ic)
+
+    def save_tran(self, x, tstep):
+        Ib = self.oppoint['Ib']
+        Ic = self.oppoint['Ic']
+        self.Ib.append(Ib)
+        self.Ic.append(Ic)
+
     def calc_oppoint(self, x):
         self.calc_dc(x)
 
-        Cje = self.options['Cje']
+        Cje = self.adjusted_options['Cje']
         Vje = self.options['Vje']
         Mje = self.options['Mje']
-        Cjc = self.options['Cjc']
+        Cjc = self.adjusted_options['Cjc']
         Vjc = self.options['Vjc']
         Mjc = self.options['Mjc']
-        Cjs = self.options['Cjs']
+        Cjs = self.adjusted_options['Cjs']
         Vjs = self.options['Vjs']
         Mjs = self.options['Mjs']
         Fc = self.options['Fc']
@@ -183,7 +233,7 @@ class BJT():
         Tf = self.options['Tf']
         Xtf = self.options['Xtf']
         Vtf = self.options['Vtf']
-        Itf = self.options['Itf']
+        Itf = self.adjusted_options['Itf']
         Tr = self.options['Tr']
 
         Vbe = self.oppoint['Vbe']
@@ -238,24 +288,24 @@ class BJT():
         E   = self.n3
         S   = self.n4
         Vt  = k * self.options['Temp'] / e
-        Is  = self.options['Is'] 
+        Is  = self.adjusted_options['Is'] 
         Nf  = self.options['Nf'] 
         Nr  = self.options['Nr'] 
-        Ikf = self.options['Ikf']
-        Ikr = self.options['Ikr']
+        Ikf = self.adjusted_options['Ikf']
+        Ikr = self.adjusted_options['Ikr']
         Vaf = self.options['Vaf']
         Var = self.options['Var']
-        Ise = self.options['Ise']
+        Ise = self.adjusted_options['Ise']
         Ne  = self.options['Ne'] 
-        Isc = self.options['Isc']
+        Isc = self.adjusted_options['Isc']
         Nc  = self.options['Nc'] 
         Bf  = self.options['Bf'] 
         Br  = self.options['Br'] 
-        Rbm = self.options['Rbm']
-        Irb = self.options['Irb']
-        Rc  = self.options['Rc'] 
-        Re  = self.options['Re'] 
-        Rb  = self.options['Rb'] 
+        Rbm = self.adjusted_options['Rbm']
+        Irb = self.adjusted_options['Irb']
+        Rc  = self.adjusted_options['Rc'] 
+        Re  = self.adjusted_options['Re'] 
+        Rb  = self.adjusted_options['Rb'] 
 
         Vb = x[B-1,0] if B > 0 else 0.
         Vc = x[C-1,0] if C > 0 else 0.
@@ -264,31 +314,33 @@ class BJT():
         Vbe = Vb - Ve
         Vbc = Vb - Vc
         Vsc = Vs - Vc
+
+        gmin = 1e-12
         
         Vbe, Vbc = self.limit_bjt_voltages(Vbe, Vbc, Vt)
 
-        If = Is * np.expm1(Vbe / (Nf * Vt))
+        If = Is * (np.exp(Vbe / (Nf * Vt)) - 1.)
 
         Ibei = If / Bf
-        Iben = Ise * np.expm1(Vbe / (Ne * Vt))
+        Iben = Ise * (np.exp(Vbe / (Ne * Vt)) - 1.) + gmin * Vbe
         Ibe  = Ibei + Iben
 
         gbei = Is / (Nf * Vt * Bf) * np.exp(Vbe / (Nf * Vt))
-        gben = Ise / (Ne * Vt) * np.exp(Vbe / (Ne * Vt))
+        gben = Ise / (Ne * Vt) * np.exp(Vbe / (Ne * Vt)) + gmin
         gpi  = gbei + gben
 
-        Ir = Is * np.expm1(Vbc / (Nr * Vt))
+        Ir = Is * (np.exp(Vbc / (Nr * Vt)) - 1.)
 
         Ibci = Ir / Br
-        Ibcn = Isc * np.expm1(Vbc / (Nc * Vt))
+        Ibcn = Isc * (np.exp(Vbc / (Nc * Vt)) - 1.) + gmin * Vbc
         Ibc  = Ibci + Ibcn
 
         gbci = Is / (Nr * Vt * Br) * np.exp(Vbc / (Nr * Vt))
-        gbcn = Isc / (Nc * Vt) * np.exp(Vbc / (Nc * Vt))
+        gbcn = Isc / (Nc * Vt) * np.exp(Vbc / (Nc * Vt)) + gmin
         gmu  = gbci + gbcn
 
-        Q2 = (If / Ikf) + (Ir / Ikr)
         Q1 = 1. / (1. - (Vbc / Vaf) - (Vbe / Var))
+        Q2 = (If / Ikf) + (Ir / Ikr)
         Qb = (Q1 / 2.) * (1. + np.sqrt(1. + 4. * Q2))
 
         It = (If - Ir) / Qb
@@ -328,18 +380,42 @@ class BJT():
         self.oppoint['dQb_dVbe'] = dQb_dVbe
         self.oppoint['dQb_dVbc'] = dQb_dVbc
 
+    def check_vlimit(self, x, vabstol):
+        B   = self.n1
+        C   = self.n2
+        E   = self.n3
+        
+        Vt  = k * self.options['Temp'] / e
+        Vb = x[B-1,0] if B > 0 else 0.
+        Vc = x[C-1,0] if C > 0 else 0.
+        Ve = x[E-1,0] if E > 0 else 0.
+
+        Vbe = Vb - Ve
+        Vbc = Vb - Vc
+
+        Vbelim, Vbclim = self.limit_bjt_voltages(Vbe, Vbc, Vt)
+
+        if (Vbe - Vbelim > vabstol) or (Vbc - Vbclim > vabstol):
+            return False
+
+        return True
+
     def limit_bjt_voltages(self, Vbe, Vbc, Vt):
         Is = self.options['Is']
         Nf = self.options['Nf']
         Nr = self.options['Nr']
 
         # limiting algorithm to avoid overflow
-        Vbecrit = Nf * Vt * np.log(Nf * Vt / (np.sqrt(2.) * Is))
-        Vbccrit = Nr * Vt * np.log(Nr * Vt / (np.sqrt(2.) * Is))
-        if (Vbe > Vbecrit and Vbe > 0.):
-            Vbe = self.Vbeold + Nf * Vt * np.log1p((Vbe - self.Vbeold) / (Nf * Vt))
-        if (Vbc > Vbccrit and Vbc > 0.):
-            Vbc = self.Vbcold + Nr * Vt * np.log1p((Vbc - self.Vbcold) / (Nr * Vt))
+        # Vbecrit = Nf * Vt * np.log(Nf * Vt / (np.sqrt(2.) * Is))
+        # Vbccrit = Nr * Vt * np.log(Nr * Vt / (np.sqrt(2.) * Is))
+        # if (Vbe > Vbecrit and Vbe > 0.):
+        #     Vbe = self.Vbeold + Nf * Vt * np.log1p((Vbe - self.Vbeold) / (Nf * Vt))
+        # if (Vbc > Vbccrit and Vbc > 0. and ((Vbc - self.Vbcold) / (Nr * Vt)) > -1.):
+        #     Vbc = self.Vbcold + Nr * Vt * np.log1p((Vbc - self.Vbcold) / (Nr * Vt))
+
+        Vbe = self.Vbeold + 10. * Nf * Vt * np.tanh((Vbe - self.Vbeold) / (10. * Nf * Vt))
+        Vbc = self.Vbcold + 10. * Nr * Vt * np.tanh((Vbc - self.Vbcold) / (10. * Nr * Vt))
+
         self.Vbeold = Vbe
         self.Vbcold = Vbc
 
@@ -347,3 +423,7 @@ class BJT():
 
     def __str__(self):
         return 'BJT: {}\nNodes BCE nodes = {}, {}, {}\n'.format(self.name, self.n1, self.n2, self.n3)
+
+# limit the maximum derivative of the exponential function
+def exp_lim(x):
+    return np.exp(x) if x < 70. else np.exp(70.) + np.exp(70.) * (x - 70.)

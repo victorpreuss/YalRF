@@ -5,7 +5,7 @@ from yalrf.Analyses.Solver import solve_linear#, solve_nonlinear
 from yalrf.Utils import dc_logger as logger
 
 import logging
-logger.setLevel(logging.WARNING)
+logger.setLevel(logging.INFO)
 
 options = dict()
 options['is_sparse'] = False
@@ -42,6 +42,7 @@ class DC():
         self.n = 0            # number of uniquely named nodes including 'gnd'
         self.m = 0            # number of independent voltage sources
         self.iidx = {}        # maps an indep. vsource idx in the MNA to a device
+        self.devs = []        # list of devices
         self.lin_devs = []    # list of linear devices
         self.nonlin_devs = [] # list of nonlinear devices
         
@@ -54,9 +55,13 @@ class DC():
         # get netlist parameters and data structures
         self.n = y.get_n()
         self.m = y.get_m('dc')
+        self.devs = y.get_devices()
         self.lin_devs = y.get_linear_devices()
         self.nonlin_devs = y.get_nonlinear_devices()
         self.iidx = y.get_mna_extra_rows_dict('dc')
+
+        # Here we go!
+        logger.info('Starting DC analysis.')
 
         # create MNA matrices for linear devices
         A = np.zeros((self.n+self.m, self.n+self.m))
@@ -66,12 +71,9 @@ class DC():
         if x0 is None: 
             x0 = self.create_x0(nodeset)
 
-        # some devices have initialization routines
-        for dev in y.get_devices():
+        # initialize devices
+        for dev in self.devs:
             dev.init()
-
-        # Here we go!
-        logger.info('Starting DC analysis.')
 
         # populate the matrices A and z with the linear devices stamps
         for dev in self.lin_devs:
@@ -117,7 +119,7 @@ class DC():
         # TODO: implement more continuation/homotopy techniques here
 
         logger.error('DC analysis failed to converge!')
-        return None
+        return self.x
 
     def solve_dc_nonlinear(self, A, z, x0):
         # get the configuration parameters
@@ -167,23 +169,24 @@ class DC():
                 if np.abs(dx[i,0]) > reltol * np.abs(xk[i,0]) + iabstol:
                     iconverged = False
 
-            logger.debug('\nA:\n{}\nAnl:\n{}\nz:\n{}\nznl\n{}'.format(A, Anl, z, znl))
-            logger.debug('\nxk:\n{}\nx:\n{}'.format(xk, self.x))
+            # check if the limited voltage is consistent with the solution
+            # TODO: investigate the need of this check
+            vlimconverged = True
+            for dev in self.devs:
+                if hasattr(dev, 'check_vlimit') and callable(dev.check_vlimit):
+                    if dev.check_vlimit(self.x, vabstol) == False:
+                        vlimconverged = False
 
-            # currently a minimum of 2 Newton-Raphson iterations is forced.
-            # when the limiting scheme of the devices is too severe, the
-            # algorithm may step very slowly towards the solution, which
-            # can be confused with convergence. 
-            # since this behavior is more commom at the first couple
-            # iterations, it is a good heuristic to force at least 2.
-            # changing 'reltol' will also work!
-            if vconverged and iconverged and k >= 2:
+            # logger.debug('\nA:\n{}\nAnl:\n{}\nz:\n{}\nznl\n{}'.format(A, Anl, z, znl))
+            # logger.debug('\nxk:\n{}\nx:\n{}'.format(xk, self.x))
+
+            if vconverged and iconverged and vlimconverged:
                 converged = True
             else:
                 xk = self.x
                 k = k + 1
 
-        logger.debug('The solver took {} iterations.'.format(k+1))
+        logger.info('The solver took {} iterations.'.format(k+1))
         return converged
 
     def solve_dc_nonlinear_using_gmin_stepping(self, A, z, x0):
