@@ -25,7 +25,7 @@ class TransientVoltageSource():
         self.trise = float(trise)
         self.tfall = float(tfall)
 
-    def get_num_vsources(self, analysis):
+    def get_num_vsources(self):
         return 1
 
     def is_nonlinear(self):

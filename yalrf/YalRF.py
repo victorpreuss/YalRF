@@ -818,7 +818,7 @@ class YalRF():
         """Return number of uniquely named nodes in the netlist."""
         return len(self.node_idx_to_name)
 
-    def get_m(self, analysis):
+    def get_m(self):
         """
         Return number of independent voltage sources for an analysis.
 
@@ -827,20 +827,15 @@ class YalRF():
         required in the matrix system. This number depends on the companion
         models used by each device for a determined analysis.
 
-        Parameters
-        ----------
-        analysis : str
-            Name of the analysis.
-
         Returns
         -------
         int
-            Number of independent voltage sources in an analysis.
+            Number of independent voltage sources required.
 
         """
         m = 0
         for dev in self.devices:
-            m = m + dev.get_num_vsources(analysis)
+            m = m + dev.get_num_vsources()
         return m
 
     def get_analysis(self, name):
@@ -950,18 +945,13 @@ class YalRF():
             logger.warning('Node index \'{}\' doesn\'t exist!'.format(idx))
             return None
     
-    def get_mna_extra_rows_dict(self, analysis):
+    def get_mna_extra_rows_dict(self):
         """
         Return a mapping of the independent vsources to the device instances.
 
         Many devices require in their companion models additional rows to
         describe their behavior, associated with independent vsources. This
         method maps what are the MNA rows assigned to each device.
-
-        Parameters
-        ----------
-        analysis : str
-            Name of the analysis to get the dictionary from.
 
         Returns
         -------
@@ -974,9 +964,9 @@ class YalRF():
         k = 0
         iidx = {}
         for dev in self.devices:
-            if dev.get_num_vsources(analysis) > 0:
+            if dev.get_num_vsources() > 0:
                 iidx[dev] = n + k
-                k = k + dev.get_num_vsources(analysis)
+                k = k + dev.get_num_vsources()
         return iidx
 
     def get_voltage_idx(self, name):
@@ -1137,12 +1127,12 @@ class YalRF():
             k = 0
             print('DC Currents:')
             for dev in self.devices:
-                if dev.get_num_vsources('dc') == 1:
+                if dev.get_num_vsources() == 1:
                     print('{}:\t{:0.6f} A'.format(dev.name, x[n+k-1,0]))
-                elif dev.get_num_vsources('dc') == 2:
+                elif dev.get_num_vsources() == 2:
                     print('{}:\t{:0.6f} A (I1)'.format(dev.name, x[n+k-1,0]))
                     print('{}:\t{:0.6f} A (I2)'.format(dev.name, x[n+k,0]))
-                k = k + dev.get_num_vsources('dc')
+                k = k + dev.get_num_vsources()
             print()
         else:
             logger.warning('Unknown analysis name: {}!'.format(name))

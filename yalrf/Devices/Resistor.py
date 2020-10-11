@@ -18,7 +18,7 @@ class Resistor():
         V = self.get_tran_voltage(x)[:,0]
         return V / self.R
 
-    def get_num_vsources(self, analysis):
+    def get_num_vsources(self):
         return 0
 
     def is_nonlinear(self):

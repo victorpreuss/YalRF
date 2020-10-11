@@ -54,11 +54,11 @@ class DC():
     def run(self, y, x0=None, nodeset=None):
         # get netlist parameters and data structures
         self.n = y.get_n()
-        self.m = y.get_m('dc')
+        self.m = y.get_m()
         self.devs = y.get_devices()
         self.lin_devs = y.get_linear_devices()
         self.nonlin_devs = y.get_nonlinear_devices()
-        self.iidx = y.get_mna_extra_rows_dict('dc')
+        self.iidx = y.get_mna_extra_rows_dict()
 
         # Here we go!
         logger.info('Starting DC analysis.')

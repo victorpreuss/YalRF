@@ -52,9 +52,9 @@ class Transient():
     def run(self, y, x0=None, nodeset=None):
         # get netlist parameters and data structures
         self.n = y.get_n()
-        self.m = y.get_m('tran')
+        self.m = y.get_m()
         self.devs = y.get_devices()
-        self.iidx = y.get_mna_extra_rows_dict('tran')
+        self.iidx = y.get_mna_extra_rows_dict()
 
         # create MNA matrices
         A = np.zeros((self.n+self.m, self.n+self.m))

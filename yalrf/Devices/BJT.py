@@ -80,7 +80,7 @@ class BJT():
         self.Ib = []
         self.Ic = []
 
-    def get_num_vsources(self, analysis):
+    def get_num_vsources(self):
         return 0
 
     def is_nonlinear(self):

@@ -57,9 +57,9 @@ class AC():
     def run(self, y, x0=None, nodeset=None):
         # get netlist parameters and data structures
         self.n = y.get_n()
-        self.m = y.get_m('ac')
+        self.m = y.get_m()
         self.devs = y.get_devices()
-        self.iidx = y.get_mna_extra_rows_dict('ac')
+        self.iidx = y.get_mna_extra_rows_dict()
         
         # perform DC simulation if no operating point is provided
         if x0 is None:

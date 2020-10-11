@@ -16,7 +16,7 @@ class Capacitor():
     def get_itran(self, x):
         return np.array(self.I)
 
-    def get_num_vsources(self, analysis):
+    def get_num_vsources(self):
         return 0
 
     def is_nonlinear(self):

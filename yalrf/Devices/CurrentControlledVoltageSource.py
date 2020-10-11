@@ -9,7 +9,7 @@ class CurrentControlledVoltageSource():
         self.G    = float(G)
         self.tau  = float(tau)
 
-    def get_num_vsources(self, analysis):
+    def get_num_vsources(self):
         return 2
 
     def is_nonlinear(self):

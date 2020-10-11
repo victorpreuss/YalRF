@@ -8,7 +8,7 @@ class Inductor():
         self.n2   = n2
         self.L    = float(value)
 
-    def get_num_vsources(self, analysis):
+    def get_num_vsources(self):
         return 1
 
     def is_nonlinear(self):
