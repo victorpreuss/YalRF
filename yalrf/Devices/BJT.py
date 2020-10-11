@@ -87,7 +87,6 @@ class BJT():
         return True
 
     def get_idc(self, x):
-        # TODO: only work for transient now
         return self.Ib[0], self.Ic[0], self.Ib[0] + self.Ic[0]
 
     def get_itran(self, x):

@@ -51,14 +51,14 @@ class DC():
     def get_dc_solution(self):
         return self.x
 
-    def run(self, y, x0=None, nodeset=None):
-        # get netlist parameters and data structures
-        self.n = y.get_n()
-        self.m = y.get_m()
-        self.devs = y.get_devices()
-        self.lin_devs = y.get_linear_devices()
-        self.nonlin_devs = y.get_nonlinear_devices()
-        self.iidx = y.get_mna_extra_rows_dict()
+    def run(self, netlist, x0=None, nodeset=None):
+        # get necessary netlist parameters and data
+        self.n = netlist.get_n()
+        self.m = netlist.get_m()
+        self.devs = netlist.get_devices()
+        self.lin_devs = netlist.get_linear_devices()
+        self.nonlin_devs = netlist.get_nonlinear_devices()
+        self.iidx = netlist.get_mna_extra_rows_dict()
 
         # Here we go!
         logger.info('Starting DC analysis.')

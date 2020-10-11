@@ -49,12 +49,12 @@ class Transient():
     def get_time(self):
         return self.time
 
-    def run(self, y, x0=None, nodeset=None):
+    def run(self, netlist, x0=None, nodeset=None):
         # get netlist parameters and data structures
-        self.n = y.get_n()
-        self.m = y.get_m()
-        self.devs = y.get_devices()
-        self.iidx = y.get_mna_extra_rows_dict()
+        self.n = netlist.get_n()
+        self.m = netlist.get_m()
+        self.devs = netlist.get_devices()
+        self.iidx = netlist.get_mna_extra_rows_dict()
 
         # create MNA matrices
         A = np.zeros((self.n+self.m, self.n+self.m))
@@ -63,14 +63,13 @@ class Transient():
         # perform DC simulation if no operating point is provided
         if x0 is None:
             dc = DC(self.name + '.DC')
-            self.xdc = dc.run(y, nodeset=nodeset)
+            self.xdc = dc.run(netlist, nodeset=nodeset)
         else:
             self.xdc = x0
 
         # initialize devices
         for dev in self.devs:
             dev.init()
-            # to initialize charge value in non-linear capacitances
             if dev.is_nonlinear():
                 dev.calc_oppoint(self.xdc)
                 dev.save_oppoint()

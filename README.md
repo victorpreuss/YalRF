@@ -61,6 +61,7 @@ y.print_dc_currents('DC1')
 - [x] implement bjt spice gummel-poon (TODO: check for singularities)
 
 ## API and Code Related:
+- [ ] current of bjts and diodes are currently stored inside the model (need to move to the analysis)
 - [ ] review log messages to see if the type make sense (info, warning, error)
 - [ ] exception handling instead of all the ifs and elses
 - [ ] send solve_linear and solve_dc_nonlinear to a Solver.py file so it can be reused
