@@ -56,8 +56,8 @@ class AC():
 
     def run(self, netlist, x0=None, nodeset=None):
         # get netlist parameters and data structures
-        self.n = netlist.get_n()
-        self.m = netlist.get_m()
+        self.n = netlist.get_num_nodes()
+        self.m = netlist.get_num_vsources()
         self.devs = netlist.get_devices()
         self.iidx = netlist.get_mna_extra_rows_dict()
         

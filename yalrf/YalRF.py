@@ -291,7 +291,7 @@ class YalRF(Netlist):
         if name in self.analyses:
             x = self.analyses[name].get_dc_solution()
             print('DC Voltages:')
-            for i in range(1, self.get_n()):
+            for i in range(1, self.get_num_nodes()):
                 print('{}:\t{:0.4f} V'.format(self.node_idx_to_name[i], x[i-1,0]))
             print()
         else:
@@ -309,7 +309,7 @@ class YalRF(Netlist):
         """
         if name in self.analyses:
             x = self.analyses[name].get_dc_solution()
-            n = self.get_n()
+            n = self.get_num_nodes()
             k = 0
             print('DC Currents:')
             for dev in self.devices:

@@ -685,13 +685,13 @@ class Netlist():
                 return True
         return True
 
-    def get_n(self):
+    def get_num_nodes(self):
         """Return number of uniquely named nodes in the netlist."""
         return len(self.node_idx_to_name)
 
-    def get_m(self):
+    def get_num_vsources(self):
         """
-        Return number of independent voltage sources for an analysis.
+        Return number of independent voltage sources.
 
         The number of independent voltage sources needed are important for
         the MNA algorithm, since it determines the number of additional rows
@@ -809,7 +809,7 @@ class Netlist():
             device instance responsible for it.
 
         """
-        n = self.get_n()
+        n = self.get_num_nodes()
         k = 0
         iidx = {}
         for dev in self.devices:

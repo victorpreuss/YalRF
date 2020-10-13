@@ -53,8 +53,8 @@ class DC():
 
     def run(self, netlist, x0=None, nodeset=None):
         # get necessary netlist parameters and data
-        self.n = netlist.get_n()
-        self.m = netlist.get_m()
+        self.n = netlist.get_num_nodes()
+        self.m = netlist.get_num_vsources()
         self.devs = netlist.get_devices()
         self.lin_devs = netlist.get_linear_devices()
         self.nonlin_devs = netlist.get_nonlinear_devices()
