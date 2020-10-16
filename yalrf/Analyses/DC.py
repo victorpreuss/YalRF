@@ -140,7 +140,7 @@ class DC():
 
             # add nonlinear element stamps
             for dev in self.nonlin_devs:
-                idx = self.iidx[dev] if dev in self.iidx else None
+                idx = self.get_extra_row_idx(dev)
                 dev.add_dc_stamps(Anl, znl, xk, idx)
 
             # index slicing is used to remove the 'gnd' node
@@ -301,3 +301,5 @@ class DC():
         
         return x0
 
+    def get_extra_row_idx(self, dev):
+        return self.iidx[dev] if dev in self.iidx else None

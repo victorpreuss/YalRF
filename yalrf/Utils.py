@@ -2,9 +2,10 @@ import logging
 
 # variables to control the logging levels
 yalrf_level = logging.ERROR
-dc_level   = logging.ERROR
-ac_level   = logging.ERROR
-tr_level   = logging.ERROR
+dc_level = logging.ERROR
+ac_level = logging.ERROR
+tr_level = logging.ERROR
+hb_level = logging.ERROR
 
 formatter = logging.Formatter('[%(levelname)s]: %(name)s: %(message)s')
 
@@ -43,6 +44,16 @@ tr_logger.setLevel(tr_level)
 
 tr_logger.addHandler(stream_handler)
 
-#file_handler = logging.FileHandler('AC.log')
+#file_handler = logging.FileHandler('TRAN.log')
 #file_handler.setFormatter(formatter)
-#ac_logger.addHandler(file_handler)
+#tr_logger.addHandler(file_handler)
+
+""" Harmonic Balance Analysis Logger """
+hb_logger = logging.getLogger('YalRF.Analyses.HarmonicBalance')
+hb_logger.setLevel(hb_level)
+
+hb_logger.addHandler(stream_handler)
+
+#file_handler = logging.FileHandler('HB.log')
+#file_handler.setFormatter(formatter)
+#hb_logger.addHandler(file_handler)

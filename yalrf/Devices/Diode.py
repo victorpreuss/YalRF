@@ -183,11 +183,6 @@ class Diode():
         self.Id.append(Idnn)
         self.Ic.append(self.Icnn)
 
-    def get_voltage(self, x):
-        V1 = x[self.n1-1] if self.n1 > 0 else 0.
-        V2 = x[self.n2-1] if self.n2 > 0 else 0.
-        return (V1 - V2)
-
     def calc_oppoint(self, x):
         self.calc_dc(x)
 
@@ -295,6 +290,11 @@ class Diode():
 
         return True
 
+    def get_voltage(self, x):
+        V1 = x[self.n1-1] if self.n1 > 0 else 0.
+        V2 = x[self.n2-1] if self.n2 > 0 else 0.
+        return (V1 - V2)
+
     def limit_diode_voltage(self, Vd, Vt):
         Is = self.adjusted_options['Is']
         N = self.options['N']
@@ -332,6 +332,32 @@ class Diode():
         I = Id - g * Vd
 
         return g, I
+
+    def get_i(self, x):
+        Is = self.adjusted_options['Is']
+        N  = self.options['N']
+        Vt = k * self.options['Temp'] / e
+
+        Vd = self.get_voltage(x)
+        Vd = self.Vdold + 10. * N * Vt * np.tanh((Vd - self.Vdold) / (10. * N * Vt))
+        self.Vdold = Vd
+
+        Id = Is * np.expm(Vd / (N * Vt))
+
+        return Id
+
+    def get_g(self, x):
+        Is = self.adjusted_options['Is']
+        N  = self.options['N']
+        Vt = k * self.options['Temp'] / e
+
+        Vd = self.get_voltage(x)
+        Vd = self.Vdold + 10. * N * Vt * np.tanh((Vd - self.Vdold) / (10. * N * Vt))
+        self.Vdold = Vd
+
+        g = Is / (N * Vt) * np.exp(Vd / (N * Vt))
+
+        return g
 
     def __str__(self):
         return 'Diode: {}\nNodes = {} -> {}\n'.format(self.name, self.n1, self.n2)
