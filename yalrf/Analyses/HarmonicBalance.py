@@ -1,6 +1,8 @@
 import numpy as np
 from scipy import linalg
 
+from yalrf.Netlist import Netlist
+from yalrf.Analyses import AC, DC
 from yalrf.Devices import *
 from yalrf.Utils import hb_logger as logger
 
@@ -28,10 +30,12 @@ class HarmonicBalance:
         nonlin_ports = []
         for dev in nonlin_devs:
             if isinstance(dev, Diode):
-                nonlin_ports.append((dev.n1, dev.n2)) # anode - cathode
-            elif isinstance(dev, BJT):
-                nonlin_ports.append((dev.n1, dev.n3)) # base - emitter
-                nonlin_ports.append((dev.n2, dev.n3)) # collector - emitter
+                port = (dev.n1, dev.n2)
+                if port not in nonlin_ports:
+                    nonlin_ports.append(port)
+            # elif isinstance(dev, BJT):
+            #     nonlin_ports.append((dev.n1, dev.n2))
+            #     nonlin_ports.append((dev.n1, dev.n3))
 
         # get list of differential ports of input voltage sources
         # also get voltage source values at DC and first harmonic
@@ -51,15 +55,17 @@ class HarmonicBalance:
         M = len(vsource_ports)
         N = len(nonlin_ports)
         
-        # period of the 1st harmonic
-        T = 1. / self.freq
-        dt = T / (2. * K)
+        T = 1. / self.freq          # period of the 1st harmonic
+        dt = T / (4. * K)           # timestep in the transient waveform
+        w1 = 2 * np.pi * self.freq  # angular frequency of the 1st harmonic
 
-        # time array
-        time = np.linspace(0, T, 2 * K, endpoint=False)
+        # time array (oversampled 2x)
+        time = np.linspace(0, T, 4 * K, endpoint=False)
 
         # array with the Kth harmonic frequencies
         freqs = self.freq * np.linspace(0, K, K+1)
+
+        """ Transadmittance matrix (Y) """
 
         # create MNA matrices for linear subcircuit
         A = np.zeros((L, L), dtype=complex)
@@ -108,44 +114,105 @@ class HarmonicBalance:
             Yvs.append(Ytrans[:N,N:])
             Ynl.append(Ytrans[:N,:N])
 
-        # calculate interconnection current caused by voltage sources
-        Is = [np.zeros((M,1)) for i in range(0, K+1)]
+        """ Interconnection current caused by voltage sources (Is) """
+
+        Is = [np.zeros((M,1)) for i in range(K+1)]
         Is[0] = Yvs[0] @ Vs[0] # dc
         Is[1] = Yvs[1] @ Vs[1] # 1st harmonic
 
-        # create initial voltage estimative for the ports
-        vt_nodes = []
-        vt_nodes.append(np.zeros((1, len(time))))
-        for node in range(1, L):
-            omega = 2 * np.pi * self.freq
-            rand_amp = np.random.random_sample()
-            rand_ph = 2. * np.pi * np.random.random_sample()
-            rand_vt = rand_amp * np.sin(omega * time + rand_ph)
-            vt_nodes.append(rand_vt)
+        """ Create initial voltage estimative for each port """
 
-        print(vt_nodes)
+        # create port voltages using AC simulation results
+        ac = AC('HB.AC', start=freqs[1], stop=freqs[K], numpts=K)
+        ac.run(netlist)
+        vac = ac.get_ac_solution()
+        vdc = ac.get_dc_solution()
 
-        vt_ports = []
-        for node in nonlin_ports:
-            n1 = node[0]
-            n2 = node[1]
-            vt_ports.append(vt_nodes[n1] - vt_nodes[n2])
+        # add dc component
+        Vnode_td = [np.zeros((4 * K))]
+        for n in range(L-1):
+            Vnode_td.append(vdc[n] * np.ones((4 * K)))
 
-        
-        a = scipy.fft.fft(vt_ports[0])
-        a = scipy.fft.fftshift(a)
+        # add the ac components
+        for n in range(L-1):
+            for k in range(K):
+                A = abs(vac[k,n])
+                phi = (k + 1) * w1 * time + np.angle(vac[k,n])
+                Vnode_td[n+1] = Vnode_td[n+1] + A * np.sin(phi)
 
-        #a = np.fft.fft(vt_ports[0])
-        #a = np.fft.fftshift(a)
-        
-        #idx = np.fft.fftfreq(len(a), dt)
-        #idx = np.fft.fftshift(idx)
+        # calculate the initial port voltages (differential)
+        Vport_td = []
+        for port in nonlin_ports:
+            Vport_td.append(Vnode_td[port[0]] - Vnode_td[port[1]])
 
-        plt.figure()
-        plt.plot(abs(a))
-        plt.grid()
-        plt.show()
+        # obtain the spectrum of each port voltage (limit to K harmonics)
+        Vport_fd = []
+        for v in Vport_td:
+            Vport_fd.append(scipy.fft.rfft(v)[0:K+1] / (4 * K))
 
+        """ Time-domain g(t) waveforms """
+
+        # create nonlinear subcircuit netlist
+        nonlin_netlist = Netlist('Netlist of the nonlinear subciruit')
+        for dev in nonlin_devs:
+            if isinstance(dev, Diode):
+                # get diode node names from full netlist
+                n1_name = netlist.get_node_name(dev.n1)
+                n2_name = netlist.get_node_name(dev.n2)
+
+                # add the diode to the new netlist
+                n1 = nonlin_netlist.add_node(n1_name)
+                n2 = nonlin_netlist.add_node(n2_name)
+
+                diode = Diode(dev.name, n1, n2)
+                diode.options = dev.options
+                nonlin_netlist.devices.append(diode)
+            
+            # TODO: generalize this for 3-port devices also
+
+        # add a voltage source to each port of the nonlinear subcircuit
+        vsources = []
+        for port in nonlin_ports:
+            n1_name = netlist.get_node_name(port[0])
+            n2_name = netlist.get_node_name(port[1])
+            
+            vname = 'V_' + n1_name + '_' + n2_name
+            v = nonlin_netlist.add_vdc(vname, n1_name, n2_name, 0)
+            vsources.append(v)
+
+        # get nonlinear subcircuits device list
+        nldevs = nonlin_netlist.get_nonlinear_devices()
+
+        # run a time-varying DC analysis to get the small-signal conductances over time
+        gt = [[] for i in range(len(nldevs))]
+        for i in range(len(time)):
+
+            # set each voltage with its time-varying value
+            for j in range(len(vsources)):
+                vsources[j].dc = Vport_td[j][i]
+            
+            # run DC analysis
+            dc = DC('HB.DC')
+            dc.run(nonlin_netlist)
+
+            # get the conductances from DC oppoint
+            for k in range(len(nldevs)):
+                gt[k].append(nldevs[k].gt)
+
+        for dev in nldevs:
+            if isinstance(dev, Diode):
+                n1_name = nonlin_netlist.get_node_name(dev.n1)
+                n2_name = nonlin_netlist.get_node_name(dev.n2)
+
+                n1 = netlist.get_node_idx(n1_name)
+                n2 = netlist.get_node_idx(n2_name)
+                
+                port = (n1, n2)
+                print(nonlin_ports.index(port))
+
+            # TODO: generalize this section for 3-port devices
+
+        print(gt)
         # fourier transform of the port voltages
 
         # get the conductance waveforms g(t)

@@ -2,12 +2,12 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 import setup
-from yalrf import YalRF
+from yalrf import YalRF, Netlist
 from yalrf.Analyses import HarmonicBalance
 
 y = YalRF('Diode Testbench')
 
-v1 = y.add_vac('V1', 'n1', 'gnd', 0.5)
+v1 = y.add_vsource('V1', 'n1', 'gnd', dc=1.0, ac=0.5)
 r1 = y.add_resistor('R1', 'n1', 'n2', 50)
 
 d1 = y.add_diode('D1', 'n2', 'n3')
@@ -20,7 +20,8 @@ d2.options['Is'] = 1e-15
 d2.options['N'] = 1
 d2.options['Area'] = 1
 
-hb = HarmonicBalance('HB1', 1e6, 3)
+# remember to always use the harmonics number to a power of 2
+hb = HarmonicBalance('HB1', 1e6, 4)
 
 x = hb.run(y)
 

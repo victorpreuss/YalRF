@@ -21,9 +21,9 @@ class VoltageSource():
         pass
 
     def add_dc_stamps(self, A, z, x, iidx):
-        A[self.n1][iidx] = +1.0 
-        A[self.n2][iidx] = -1.0 
-        A[iidx][self.n1] = +1.0 
+        A[self.n1][iidx] = +1.0
+        A[self.n2][iidx] = -1.0
+        A[iidx][self.n1] = +1.0
         A[iidx][self.n2] = -1.0
         z[iidx] = self.dc
 
