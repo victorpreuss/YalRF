@@ -14,7 +14,7 @@ import matplotlib.pyplot as plt
 
 class HarmonicBalance:
 
-    def __init__(self, name, freq, numharmonics=3):
+    def __init__(self, name, freq, numharmonics=4):
         self.name = name
         self.freq = freq
         self.numharmonics = numharmonics
@@ -25,6 +25,8 @@ class HarmonicBalance:
         lin_devs = netlist.get_linear_devices()
         nonlin_devs = netlist.get_nonlinear_devices()
         iidx = netlist.get_mna_extra_rows_dict()
+
+        """ Get nonlinear and voltage source ports """
 
         # get list of differential ports of the nonlinear subcircuit
         nonlin_ports = []
@@ -44,10 +46,14 @@ class HarmonicBalance:
         vsource_ports = []
         for dev in lin_devs:
             if isinstance(dev, VoltageSource):
-                vsource_ports.append((dev.n1, dev.n2))
+                port = (dev.n1, dev.n2)
+                if port not in nonlin_ports:
+                    vsource_ports.append(port)
                 Vs_dc.append(dev.dc)
                 Vs_ac.append(dev.ac)
         Vs = [np.array([Vs_dc]).T, np.array([Vs_ac]).T]
+
+        """ Get basic information """
 
         # get the appropriate lengths
         K = self.numharmonics
@@ -114,6 +120,24 @@ class HarmonicBalance:
             Yvs.append(Ytrans[:N,N:])
             Ynl.append(Ytrans[:N,:N])
 
+        # form the Y matrix based on Ynl
+        Ysize = 2 * N * (K+1)
+        Y = np.zeros((Ysize, Ysize))
+        for i in range(N):
+            for j in range(N):
+                for k in range(K+1):
+                    # get the Ymnk 2x2 matrix
+                    Ymnk = np.zeros((2,2))
+                    Ymnk[0,0] = +Ynl[k][i,j].real
+                    Ymnk[0,1] = -Ynl[k][i,j].imag
+                    Ymnk[1,0] = +Ynl[k][i,j].imag
+                    Ymnk[1,1] = +Ynl[k][i,j].real
+
+                    # put it in the Y matrix
+                    I = 2 * (K+1) * i + 2 * k
+                    J = 2 * (K+1) * j + 2 * k
+                    Y[I:I+2,J:J+2] = Ymnk
+                            
         """ Interconnection current caused by voltage sources (Is) """
 
         Is = [np.zeros((M,1)) for i in range(K+1)]
@@ -148,7 +172,7 @@ class HarmonicBalance:
         # obtain the spectrum of each port voltage (limit to K harmonics)
         Vport_fd = []
         for v in Vport_td:
-            Vport_fd.append(scipy.fft.rfft(v)[0:K+1] / (4 * K))
+            Vport_fd.append(scipy.fft.rfft(v)[:K+1] / (4 * K))
 
         """ Time-domain g(t) waveforms """
 
@@ -184,7 +208,7 @@ class HarmonicBalance:
         nldevs = nonlin_netlist.get_nonlinear_devices()
 
         # run a time-varying DC analysis to get the small-signal conductances over time
-        gt = [[] for i in range(len(nldevs))]
+        gt = np.zeros((len(nldevs), len(time)))
         for i in range(len(time)):
 
             # set each voltage with its time-varying value
@@ -196,26 +220,33 @@ class HarmonicBalance:
             dc.run(nonlin_netlist)
 
             # get the conductances from DC oppoint
-            for k in range(len(nldevs)):
-                gt[k].append(nldevs[k].gt)
-
-        for dev in nldevs:
-            if isinstance(dev, Diode):
-                n1_name = nonlin_netlist.get_node_name(dev.n1)
-                n2_name = nonlin_netlist.get_node_name(dev.n2)
-
-                n1 = netlist.get_node_idx(n1_name)
-                n2 = netlist.get_node_idx(n2_name)
-                
-                port = (n1, n2)
-                print(nonlin_ports.index(port))
-
             # TODO: generalize this section for 3-port devices
+            for k in range(len(nldevs)):
+                dev = nldevs[k]
+                if isinstance(dev, Diode):
+                    n1_name = nonlin_netlist.get_node_name(dev.n1)
+                    n2_name = nonlin_netlist.get_node_name(dev.n2)
 
-        print(gt)
-        # fourier transform of the port voltages
+                    n1 = netlist.get_node_idx(n1_name)
+                    n2 = netlist.get_node_idx(n2_name)
 
-        # get the conductance waveforms g(t)
+                    port = (n1, n2)
+                    n = nonlin_ports.index(port)
+                    
+                    gt[n,i] = gt[n,i] + dev.gt
+
+        G = []
+        for i in range(len(nonlin_ports)):
+            G.append(scipy.fft.rfft(gt[i,:])[:K+1] / (4 * K))
+
+        # plt.figure()
+        # plt.subplot(121)
+        # plt.plot(gt[0,:])
+        # plt.grid()
+        # plt.subplot(122)
+        # plt.stem(abs(G[0]), use_line_collection=True)
+        # plt.grid()
+        # plt.show()
 
         # create the Jacobian and F(V0)
 
