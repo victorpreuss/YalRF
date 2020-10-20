@@ -36,8 +36,8 @@ class HarmonicBalance:
                 if port not in nonlin_ports:
                     nonlin_ports.append(port)
             # elif isinstance(dev, BJT):
-            #     nonlin_ports.append((dev.n1, dev.n2))
             #     nonlin_ports.append((dev.n1, dev.n3))
+            #     nonlin_ports.append((dev.n2, dev.n3))
 
         # get list of differential ports of input voltage sources
         # also get voltage source values at DC and first harmonic
@@ -57,6 +57,7 @@ class HarmonicBalance:
 
         # get the appropriate lengths
         K = self.numharmonics
+        Kk = 2 * (K + 1)
         L = netlist.get_num_nodes()
         M = len(vsource_ports)
         N = len(nonlin_ports)
@@ -117,8 +118,8 @@ class HarmonicBalance:
             Ytrans = linalg.pinv(Ztrans) - np.eye(N+M) * 0.01
 
             # split the transadmittance matrix between nonlinear and voltage source ports
-            Yvs.append(Ytrans[:N,N:])
-            Ynl.append(Ytrans[:N,:N])
+            Yvs.append(Ytrans[:N,N:]) # (NxM)
+            Ynl.append(Ytrans[:N,:N]) # (NxN)
 
         # form the Y matrix based on Ynl
         Ysize = 2 * N * (K+1)
@@ -134,8 +135,8 @@ class HarmonicBalance:
                     Ymnk[1,1] = +Ynl[k][i,j].real
 
                     # put it in the Y matrix
-                    I = 2 * (K+1) * i + 2 * k
-                    J = 2 * (K+1) * j + 2 * k
+                    I = Kk * i + 2 * k
+                    J = Kk * j + 2 * k
                     Y[I:I+2,J:J+2] = Ymnk
                             
         """ Interconnection current caused by voltage sources (Is) """
@@ -208,11 +209,11 @@ class HarmonicBalance:
         nldevs = nonlin_netlist.get_nonlinear_devices()
 
         # run a time-varying DC analysis to get the small-signal conductances over time
-        gt = np.zeros((len(nldevs), len(time)))
+        gt = np.zeros((N, N, len(time)))
         for i in range(len(time)):
 
             # set each voltage with its time-varying value
-            for j in range(len(vsources)):
+            for j in range(N):
                 vsources[j].dc = Vport_td[j][i]
             
             # run DC analysis
@@ -233,18 +234,105 @@ class HarmonicBalance:
                     port = (n1, n2)
                     n = nonlin_ports.index(port)
                     
-                    gt[n,i] = gt[n,i] + dev.gt
+                    gt[n,n,i] = gt[n,n,i] + dev.gt
 
-        G = []
-        for i in range(len(nonlin_ports)):
-            G.append(scipy.fft.rfft(gt[i,:])[:K+1] / (4 * K))
+        # compute the spectrum of each port conductance
+        G = np.zeros((N, N, K+1), dtype=complex)
+        for n in range(N):
+            G[n,n,:] = scipy.fft.rfft(gt[n,n,:])[:K+1] / (4 * K)
+
+        # creating matrices that form dI/dV
+        Toe = np.zeros((Ysize, Ysize))
+        Han = np.zeros((Ysize, Ysize))
+        D = np.eye(Ysize)
+
+        # DC elements are 1/2 (from DFT derivation)
+        for i in range(N):
+            k = Kk * i
+            D[k,k] = 0.5
+            D[k+1,k+1] = 0.5
+
+        # creating the Toeplitz matrix
+        for i in range(N):
+            for j in range(N):
+                Tmn = np.zeros((Kk, Kk))
+                for k in range(K+1):
+                    for l in range(k, K+1):
+                        
+                        z = abs(k-l)
+                        t = np.zeros((2,2))
+
+                        t[0,0] = +G[i,j,z].real
+                        t[0,1] = +G[i,j,z].imag
+                        t[1,0] = -G[i,j,z].imag
+                        t[1,1] = +G[i,j,z].real
+
+                        Tmn[2*k:2*k+2, 2*l:2*l+2] = t
+
+                        t[0,1] = -t[0,1]
+                        t[1,0] = -t[1,0]
+
+                        Tmn[2*l:2*l+2, 2*k:2*k+2] = t
+
+                # insert Tmn (Kk x Kk) submatrix into the proper position
+                I = Kk * i
+                J = Kk * j
+                Toe[I:I+Kk,J:J+Kk] = Tmn
+
+        # creating the Hankel matrix
+        for i in range(N):
+            for j in range(N):
+                Hmn = np.zeros((Kk, Kk))
+                for k in range(K+1):
+                    for l in range(K+1):
+                        
+                        z = k + l
+                        h = np.zeros((2,2))
+
+                        if z < K+1:
+                            h[0,0] = +G[i,j,z].real
+                            h[0,1] = +G[i,j,z].imag
+                            h[1,0] = +G[i,j,z].imag
+                            h[1,1] = -G[i,j,z].real
+                        else:
+                            z = 2 * K + 1 - z
+                            h[0,0] = +G[i,j,z].real
+                            h[0,1] = -G[i,j,z].imag
+                            h[1,0] = -G[i,j,z].imag
+                            h[1,1] = -G[i,j,z].real
+
+                        Hmn[2*k:2*k+2, 2*l:2*l+2] = h
+
+                # insert Tmn (Kk x Kk) submatrix into the proper position
+                I = Kk * i
+                J = Kk * j
+                Han[I:I+Kk,J:J+Kk] = Hmn
+
+        dIdV = (Toe + Han) @ D
+
+        np.set_printoptions(precision=2, suppress=False, linewidth=150)
+        print(Y)
+        print(G)
+        print(Toe)
+        print(Han)
+        print(D)
+        print(dIdV)
+
+        J = Y + dIdV # + Omega * dQdV
+
+        print(linalg.pinv(J))
+
+        
+
+        # print(G[0,0,:])
+        # print(G[1,1,:])
 
         # plt.figure()
         # plt.subplot(121)
-        # plt.plot(gt[0,:])
+        # plt.plot(gt[0,0])
         # plt.grid()
         # plt.subplot(122)
-        # plt.stem(abs(G[0]), use_line_collection=True)
+        # plt.stem(abs(G[0,0]), use_line_collection=True)
         # plt.grid()
         # plt.show()
 
