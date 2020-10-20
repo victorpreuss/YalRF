@@ -122,7 +122,7 @@ class HarmonicBalance:
             Ynl.append(Ytrans[:N,:N]) # (NxN)
 
         # form the Y matrix based on Ynl
-        Ysize = 2 * N * (K+1)
+        Ysize = Kk * N
         Y = np.zeros((Ysize, Ysize))
         for i in range(N):
             for j in range(N):
@@ -139,13 +139,19 @@ class HarmonicBalance:
                     J = Kk * j + 2 * k
                     Y[I:I+2,J:J+2] = Ymnk
                             
-        """ Interconnection current caused by voltage sources (Is) """
+        """ Interconnection current created by voltage sources (Is) """
 
-        Is = [np.zeros((M,1)) for i in range(K+1)]
-        Is[0] = Yvs[0] @ Vs[0] # dc
-        Is[1] = Yvs[1] @ Vs[1] # 1st harmonic
+        Itempdc = Yvs[0] @ Vs[0] # dc
+        Itempac = Yvs[1] @ Vs[1] # 1st harmonic
 
-        """ Create initial voltage estimative for each port """
+        Is = np.zeros((Kk * N, 1))
+        for i in range(N):
+            Is[Kk*i+0] = Itempdc[i].real
+            Is[Kk*i+1] = Itempdc[i].imag
+            Is[Kk*i+2] = Itempac[i].real
+            Is[Kk*i+3] = Itempac[i].imag
+        
+        """ Initial voltage estimative for each port (V) """
 
         # create port voltages using AC simulation results
         ac = AC('HB.AC', start=freqs[1], stop=freqs[K], numpts=K)
@@ -175,7 +181,14 @@ class HarmonicBalance:
         for v in Vport_td:
             Vport_fd.append(scipy.fft.rfft(v)[:K+1] / (4 * K))
 
-        """ Time-domain g(t) waveforms """
+        # assemble the voltage vector appropriately
+        V = np.zeros((Kk * N, 1))
+        for i in range(N):
+            for k in range(K+1):
+                V[Kk*i+2*k] = Vport_fd[i][k].real
+                V[Kk*i+2*k+1] = Vport_fd[i][k].imag
+
+        """ Assemble of nonlinear subcircuit """
 
         # create nonlinear subcircuit netlist
         nonlin_netlist = Netlist('Netlist of the nonlinear subciruit')
@@ -208,121 +221,145 @@ class HarmonicBalance:
         # get nonlinear subcircuits device list
         nldevs = nonlin_netlist.get_nonlinear_devices()
 
-        # run a time-varying DC analysis to get the small-signal conductances over time
-        gt = np.zeros((N, N, len(time)))
-        for i in range(len(time)):
+        for a in range(10): # run 10 iterations of HB
 
-            # set each voltage with its time-varying value
-            for j in range(N):
-                vsources[j].dc = Vport_td[j][i]
-            
-            # run DC analysis
-            dc = DC('HB.DC')
-            dc.run(nonlin_netlist)
+            """ Time-domain g(t) and i(t) waveforms """
 
-            # get the conductances from DC oppoint
+            # run a time-varying DC analysis to get the small-signal conductances over time
+            # TODO: wasting memory here (and also everywhere else)
+            gt = np.zeros((N, N, len(time)))
+            it = np.zeros((N, N, len(time)))
+            for i in range(len(time)):
+
+                # set each voltage with its time-varying value
+                for j in range(N):
+                    vsources[j].dc = Vport_td[j][i]
+                
+                # run DC analysis
+                dc = DC('HB.DC')
+                dc.run(nonlin_netlist)
+
+                # get the conductances from DC oppoint
+                # TODO: generalize this section for 3-port devices
+                for k in range(len(nldevs)):
+                    dev = nldevs[k]
+                    if isinstance(dev, Diode):
+                        n1_name = nonlin_netlist.get_node_name(dev.n1)
+                        n2_name = nonlin_netlist.get_node_name(dev.n2)
+
+                        n1 = netlist.get_node_idx(n1_name)
+                        n2 = netlist.get_node_idx(n2_name)
+
+                        port = (n1, n2)
+                        n = nonlin_ports.index(port)
+                        
+                        gt[n,n,i] = gt[n,n,i] + dev.gt
+                        it[n,n,i] = it[n,n,i] + dev.It
+
+            # compute the spectrum of each port conductance
             # TODO: generalize this section for 3-port devices
-            for k in range(len(nldevs)):
-                dev = nldevs[k]
-                if isinstance(dev, Diode):
-                    n1_name = nonlin_netlist.get_node_name(dev.n1)
-                    n2_name = nonlin_netlist.get_node_name(dev.n2)
+            G = np.zeros((N, N, K+1), dtype=complex)
+            for i in range(N):
+                G[i,i,:] = scipy.fft.rfft(gt[i,i,:])[:K+1] / (4 * K)
 
-                    n1 = netlist.get_node_idx(n1_name)
-                    n2 = netlist.get_node_idx(n2_name)
+            """ Nonlinear current (Ig) """
 
-                    port = (n1, n2)
-                    n = nonlin_ports.index(port)
-                    
-                    gt[n,n,i] = gt[n,n,i] + dev.gt
-
-        # compute the spectrum of each port conductance
-        G = np.zeros((N, N, K+1), dtype=complex)
-        for n in range(N):
-            G[n,n,:] = scipy.fft.rfft(gt[n,n,:])[:K+1] / (4 * K)
-
-        # creating matrices that form dI/dV
-        Toe = np.zeros((Ysize, Ysize))
-        Han = np.zeros((Ysize, Ysize))
-        D = np.eye(Ysize)
-
-        # DC elements are 1/2 (from DFT derivation)
-        for i in range(N):
-            k = Kk * i
-            D[k,k] = 0.5
-            D[k+1,k+1] = 0.5
-
-        # creating the Toeplitz matrix
-        for i in range(N):
-            for j in range(N):
-                Tmn = np.zeros((Kk, Kk))
+            # TODO: generalize this section for 3-port devices
+            Ig = np.zeros((Kk * N, 1))
+            for i in range(N):
+                Iport_fd = scipy.fft.rfft(it[i,i,:])[:K+1] / (4 * K)
                 for k in range(K+1):
-                    for l in range(k, K+1):
-                        
-                        z = abs(k-l)
-                        t = np.zeros((2,2))
+                    Ig[Kk*i+2*k] = Iport_fd[k].real
+                    Ig[Kk*i+2*k+1] = Iport_fd[k].imag
 
-                        t[0,0] = +G[i,j,z].real
-                        t[0,1] = +G[i,j,z].imag
-                        t[1,0] = -G[i,j,z].imag
-                        t[1,1] = +G[i,j,z].real
+            """ Creating the dIdV matrix from G(jw) """
 
-                        Tmn[2*k:2*k+2, 2*l:2*l+2] = t
+            # creating matrices that form dI/dV
+            Toe = np.zeros((Ysize, Ysize))
+            Han = np.zeros((Ysize, Ysize))
+            D = np.eye(Ysize)
 
-                        t[0,1] = -t[0,1]
-                        t[1,0] = -t[1,0]
+            # DC elements are 1/2 (from DFT derivation)
+            for i in range(N):
+                k = Kk * i
+                D[k,k] = 0.5
+                D[k+1,k+1] = 0.5
 
-                        Tmn[2*l:2*l+2, 2*k:2*k+2] = t
+            # creating the Toeplitz matrix
+            for i in range(N):
+                for j in range(N):
+                    Tmn = np.zeros((Kk, Kk))
+                    for k in range(K+1):
+                        for l in range(k, K+1):
+                            
+                            z = abs(k-l)
+                            t = np.zeros((2,2))
 
-                # insert Tmn (Kk x Kk) submatrix into the proper position
-                I = Kk * i
-                J = Kk * j
-                Toe[I:I+Kk,J:J+Kk] = Tmn
+                            t[0,0] = +G[i,j,z].real
+                            t[0,1] = +G[i,j,z].imag
+                            t[1,0] = -G[i,j,z].imag
+                            t[1,1] = +G[i,j,z].real
 
-        # creating the Hankel matrix
-        for i in range(N):
-            for j in range(N):
-                Hmn = np.zeros((Kk, Kk))
-                for k in range(K+1):
-                    for l in range(K+1):
-                        
-                        z = k + l
-                        h = np.zeros((2,2))
+                            Tmn[2*k:2*k+2,2*l:2*l+2] = t
 
-                        if z < K+1:
-                            h[0,0] = +G[i,j,z].real
-                            h[0,1] = +G[i,j,z].imag
-                            h[1,0] = +G[i,j,z].imag
-                            h[1,1] = -G[i,j,z].real
-                        else:
-                            z = 2 * K + 1 - z
-                            h[0,0] = +G[i,j,z].real
-                            h[0,1] = -G[i,j,z].imag
-                            h[1,0] = -G[i,j,z].imag
-                            h[1,1] = -G[i,j,z].real
+                            t[0,1] = -t[0,1]
+                            t[1,0] = -t[1,0]
 
-                        Hmn[2*k:2*k+2, 2*l:2*l+2] = h
+                            Tmn[2*l:2*l+2,2*k:2*k+2] = t
 
-                # insert Tmn (Kk x Kk) submatrix into the proper position
-                I = Kk * i
-                J = Kk * j
-                Han[I:I+Kk,J:J+Kk] = Hmn
+                    # insert Tmn (Kk x Kk) submatrix into the proper position
+                    I = Kk * i
+                    J = Kk * j
+                    Toe[I:I+Kk,J:J+Kk] = Tmn
 
-        dIdV = (Toe + Han) @ D
+            # creating the Hankel matrix
+            for i in range(N):
+                for j in range(N):
+                    Hmn = np.zeros((Kk, Kk))
+                    for k in range(K+1):
+                        for l in range(K+1):
+                            
+                            z = k + l
+                            h = np.zeros((2,2))
 
-        np.set_printoptions(precision=2, suppress=False, linewidth=150)
-        print(Y)
-        print(G)
-        print(Toe)
-        print(Han)
-        print(D)
-        print(dIdV)
+                            if z < K+1:
+                                h[0,0] = +G[i,j,z].real
+                                h[0,1] = +G[i,j,z].imag
+                                h[1,0] = +G[i,j,z].imag
+                                h[1,1] = -G[i,j,z].real
+                            else:
+                                z = 2 * K + 1 - z
+                                h[0,0] = +G[i,j,z].real
+                                h[0,1] = -G[i,j,z].imag
+                                h[1,0] = -G[i,j,z].imag
+                                h[1,1] = -G[i,j,z].real
 
-        J = Y + dIdV # + Omega * dQdV
+                            Hmn[2*k:2*k+2,2*l:2*l+2] = h
 
-        print(linalg.pinv(J))
+                    # insert Hmn (Kk x Kk) submatrix into the proper position
+                    I = Kk * i
+                    J = Kk * j
+                    Han[I:I+Kk,J:J+Kk] = Hmn
 
-        
+            dIdV = (Toe + Han) @ D
+            J = Y + dIdV # + Omega * dQdV
+            F = Is + Y @ V + Ig # + j * Omega * Q
+
+            newV = V - linalg.pinv(J) @ F
+
+            np.set_printoptions(precision=2, suppress=False, linewidth=150)
+            print('V = {}'.format(V))
+            print('Is = {}'.format(Is))
+            print('Ig = {}'.format(Ig))
+            print('Y = {}'.format(Y))
+            print('G = {}'.format(G))
+            print('Toe = {}'.format(Toe))
+            print('Han = {}'.format(Han))
+            print('D = {}'.format(D))
+            print('dIdV = {}'.format(dIdV))
+            print('J = {}'.format(J))
+            print('F = {}'.format(F))
+            print('newV = {}'.format(newV))
 
         # print(G[0,0,:])
         # print(G[1,1,:])
