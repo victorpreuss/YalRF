@@ -55,12 +55,13 @@ class HarmonicBalance:
 
         """ Get basic information """
 
-        # get the appropriate lengths
-        K = self.numharmonics
-        Kk = 2 * (K + 1)
-        L = netlist.get_num_nodes()
-        M = len(vsource_ports)
-        N = len(nonlin_ports)
+        K = self.numharmonics       # frequency of the 1st harmonic
+        L = netlist.get_num_nodes() # total number of nodes in the netlist
+        M = len(vsource_ports)      # number of voltage source ports
+        N = len(nonlin_ports)       # number of nonlinear ports
+
+        Kk = 2 * (K + 1)            # size of block matrices in the system
+        W = Kk * N                  # total size of the matrix system 2 * (K+1) * N
         
         T = 1. / self.freq          # period of the 1st harmonic
         dt = T / (4. * K)           # timestep in the transient waveform
@@ -71,6 +72,39 @@ class HarmonicBalance:
 
         # array with the Kth harmonic frequencies
         freqs = self.freq * np.linspace(0, K, K+1)
+
+        """ Assembly of nonlinear subcircuit """
+
+        # create nonlinear subcircuit netlist
+        nonlin_netlist = Netlist('Netlist of the nonlinear subciruit')
+        for dev in nonlin_devs:
+            if isinstance(dev, Diode):
+                # get diode node names from full netlist
+                n1_name = netlist.get_node_name(dev.n1)
+                n2_name = netlist.get_node_name(dev.n2)
+
+                # add the diode to the new netlist
+                n1 = nonlin_netlist.add_node(n1_name)
+                n2 = nonlin_netlist.add_node(n2_name)
+
+                diode = Diode(dev.name, n1, n2)
+                diode.options = dev.options
+                nonlin_netlist.devices.append(diode)
+            
+            # TODO: generalize this for 3-port devices also
+
+        # add a voltage source to each port of the nonlinear subcircuit
+        vsources = []
+        for port in nonlin_ports:
+            n1_name = netlist.get_node_name(port[0])
+            n2_name = netlist.get_node_name(port[1])
+            
+            vname = 'V_' + n1_name + '_' + n2_name
+            v = nonlin_netlist.add_vdc(vname, n1_name, n2_name, 0)
+            vsources.append(v)
+
+        # get nonlinear subcircuits device list
+        nldevs = nonlin_netlist.get_nonlinear_devices()
 
         """ Transadmittance matrix (Y) """
 
@@ -120,10 +154,11 @@ class HarmonicBalance:
             # split the transadmittance matrix between nonlinear and voltage source ports
             Yvs.append(Ytrans[:N,N:]) # (NxM)
             Ynl.append(Ytrans[:N,:N]) # (NxN)
+            print(Ynl)
+            print(Yvs)
 
         # form the Y matrix based on Ynl
-        Ysize = Kk * N
-        Y = np.zeros((Ysize, Ysize))
+        Y = np.zeros((W, W))
         for i in range(N):
             for j in range(N):
                 for k in range(K+1):
@@ -144,7 +179,7 @@ class HarmonicBalance:
         Itempdc = Yvs[0] @ Vs[0] # dc
         Itempac = Yvs[1] @ Vs[1] # 1st harmonic
 
-        Is = np.zeros((Kk * N, 1))
+        Is = np.zeros((W, 1))
         for i in range(N):
             Is[Kk*i+0] = Itempdc[i].real
             Is[Kk*i+1] = Itempdc[i].imag
@@ -159,69 +194,30 @@ class HarmonicBalance:
         vac = ac.get_ac_solution()
         vdc = ac.get_dc_solution()
 
-        # add dc component
-        Vnode_td = [np.zeros((4 * K))]
-        for n in range(L-1):
-            Vnode_td.append(vdc[n] * np.ones((4 * K)))
+        # add 'gnd' node
+        vdc = np.insert(vdc, 0, 0, axis=0)
+        vac = np.insert(vac, 0, 0, axis=1)
 
-        # add the ac components
-        for n in range(L-1):
-            for k in range(K):
-                A = abs(vac[k,n])
-                phi = (k + 1) * w1 * time + np.angle(vac[k,n])
-                Vnode_td[n+1] = Vnode_td[n+1] + A * np.sin(phi)
-
-        # calculate the initial port voltages (differential)
-        Vport_td = []
-        for port in nonlin_ports:
-            Vport_td.append(Vnode_td[port[0]] - Vnode_td[port[1]])
-
-        # obtain the spectrum of each port voltage (limit to K harmonics)
-        Vport_fd = []
-        for v in Vport_td:
-            Vport_fd.append(scipy.fft.rfft(v)[:K+1] / (4 * K))
-
-        # assemble the voltage vector appropriately
-        V = np.zeros((Kk * N, 1))
+        V = np.zeros((W, 1))
         for i in range(N):
-            for k in range(K+1):
-                V[Kk*i+2*k] = Vport_fd[i][k].real
-                V[Kk*i+2*k+1] = Vport_fd[i][k].imag
+            port = nonlin_ports[i]
+            V[Kk*i] = vdc[port[0]] - vdc[port[1]]
+            for k in range(1):
+                vport = vac[k,port[0]] - vac[k,port[1]]
+                V[Kk*i+2*(k+1)+0] = vport.real
+                V[Kk*i+2*(k+1)+1] = vport.imag
 
-        """ Assemble of nonlinear subcircuit """
+        for a in range(20): # run 10 iterations of HB
 
-        # create nonlinear subcircuit netlist
-        nonlin_netlist = Netlist('Netlist of the nonlinear subciruit')
-        for dev in nonlin_devs:
-            if isinstance(dev, Diode):
-                # get diode node names from full netlist
-                n1_name = netlist.get_node_name(dev.n1)
-                n2_name = netlist.get_node_name(dev.n2)
+            """ Time-domaing v(t) """
 
-                # add the diode to the new netlist
-                n1 = nonlin_netlist.add_node(n1_name)
-                n2 = nonlin_netlist.add_node(n2_name)
-
-                diode = Diode(dev.name, n1, n2)
-                diode.options = dev.options
-                nonlin_netlist.devices.append(diode)
-            
-            # TODO: generalize this for 3-port devices also
-
-        # add a voltage source to each port of the nonlinear subcircuit
-        vsources = []
-        for port in nonlin_ports:
-            n1_name = netlist.get_node_name(port[0])
-            n2_name = netlist.get_node_name(port[1])
-            
-            vname = 'V_' + n1_name + '_' + n2_name
-            v = nonlin_netlist.add_vdc(vname, n1_name, n2_name, 0)
-            vsources.append(v)
-
-        # get nonlinear subcircuits device list
-        nldevs = nonlin_netlist.get_nonlinear_devices()
-
-        for a in range(10): # run 10 iterations of HB
+            # inverse fourier transform of the voltage waveform
+            vt = [None] * N
+            for i in range(N):
+                vf = np.zeros(K+1, dtype=complex)
+                for k in range(K+1):
+                    vf[k] = V[Kk*i+2*k+0] + 1j * V[Kk*i+2*k+1]
+                vt[i] = scipy.fft.irfft(vf, 4 * K) * (2 * K)
 
             """ Time-domain g(t) and i(t) waveforms """
 
@@ -233,7 +229,8 @@ class HarmonicBalance:
 
                 # set each voltage with its time-varying value
                 for j in range(N):
-                    vsources[j].dc = Vport_td[j][i]
+                    vsources[j].dc = vt[j][i]
+                    print('Vsource = {}'.format(vsources[j].dc))
                 
                 # run DC analysis
                 dc = DC('HB.DC')
@@ -260,24 +257,24 @@ class HarmonicBalance:
             # TODO: generalize this section for 3-port devices
             G = np.zeros((N, N, K+1), dtype=complex)
             for i in range(N):
-                G[i,i,:] = scipy.fft.rfft(gt[i,i,:])[:K+1] / (4 * K)
+                G[i,i,:] = scipy.fft.rfft(gt[i,i,:])[:K+1] / (8 * K)
 
             """ Nonlinear current (Ig) """
 
             # TODO: generalize this section for 3-port devices
-            Ig = np.zeros((Kk * N, 1))
+            Ig = np.zeros((W, 1))
             for i in range(N):
-                Iport_fd = scipy.fft.rfft(it[i,i,:])[:K+1] / (4 * K)
+                iportf = scipy.fft.rfft(it[i,i,:])[:K+1] / (8 * K)
                 for k in range(K+1):
-                    Ig[Kk*i+2*k] = Iport_fd[k].real
-                    Ig[Kk*i+2*k+1] = Iport_fd[k].imag
+                    Ig[Kk*i+2*k] = iportf[k].real
+                    Ig[Kk*i+2*k+1] = iportf[k].imag
 
             """ Creating the dIdV matrix from G(jw) """
 
             # creating matrices that form dI/dV
-            Toe = np.zeros((Ysize, Ysize))
-            Han = np.zeros((Ysize, Ysize))
-            D = np.eye(Ysize)
+            Toe = np.zeros((W, W))
+            Han = np.zeros((W, W))
+            D = np.eye(W)
 
             # DC elements are 1/2 (from DFT derivation)
             for i in range(N):
@@ -342,24 +339,22 @@ class HarmonicBalance:
                     Han[I:I+Kk,J:J+Kk] = Hmn
 
             dIdV = (Toe + Han) @ D
-            J = Y + dIdV # + Omega * dQdV
-            F = Is + Y @ V + Ig # + j * Omega * Q
-
-            newV = V - linalg.pinv(J) @ F
+            J = Y + dIdV + np.eye(W) * 1e-12        # + Omega * dQdV
+            F = Is + Y @ V + Ig                     # + j * Omega * Q
+            V = V - linalg.inv(J) @ F
 
             np.set_printoptions(precision=2, suppress=False, linewidth=150)
-            print('V = {}'.format(V))
-            print('Is = {}'.format(Is))
-            print('Ig = {}'.format(Ig))
+            # print('Is = {}'.format(Is))
+            # print('Ig = {}'.format(Ig))
             print('Y = {}'.format(Y))
-            print('G = {}'.format(G))
-            print('Toe = {}'.format(Toe))
-            print('Han = {}'.format(Han))
-            print('D = {}'.format(D))
+            # print('G = {}'.format(G))
+            # print('Toe = {}'.format(Toe))
+            # print('Han = {}'.format(Han))
+            # print('D = {}'.format(D))
             print('dIdV = {}'.format(dIdV))
-            print('J = {}'.format(J))
-            print('F = {}'.format(F))
-            print('newV = {}'.format(newV))
+            # print('J = {}'.format(J))
+            # print('F = {}'.format(F))
+            print('V = {}'.format(V))
 
         # print(G[0,0,:])
         # print(G[1,1,:])
@@ -372,13 +367,3 @@ class HarmonicBalance:
         # plt.stem(abs(G[0,0]), use_line_collection=True)
         # plt.grid()
         # plt.show()
-
-        # create the Jacobian and F(V0)
-
-        # apply NR to obtain a new guess
-
-        # fourier transform of the nonlinear currents
-
-        # calculate F(V1) using the new voltage guess
-
-        
