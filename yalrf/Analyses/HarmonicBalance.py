@@ -154,8 +154,6 @@ class HarmonicBalance:
             # split the transadmittance matrix between nonlinear and voltage source ports
             Yvs.append(Ytrans[:N,N:]) # (NxM)
             Ynl.append(Ytrans[:N,:N]) # (NxN)
-            print(Ynl)
-            print(Yvs)
 
         # form the Y matrix based on Ynl
         Y = np.zeros((W, W))
@@ -185,6 +183,8 @@ class HarmonicBalance:
             Is[Kk*i+1] = Itempdc[i].imag
             Is[Kk*i+2] = Itempac[i].real
             Is[Kk*i+3] = Itempac[i].imag
+
+        # Is = Is / (2 * K)
         
         """ Initial voltage estimative for each port (V) """
 
@@ -207,9 +207,9 @@ class HarmonicBalance:
                 V[Kk*i+2*(k+1)+0] = vport.real
                 V[Kk*i+2*(k+1)+1] = vport.imag
 
-        for a in range(20): # run 10 iterations of HB
+        for a in range(10): # run 10 iterations of HB
 
-            """ Time-domaing v(t) """
+            """ Time-domain v(t) """
 
             # inverse fourier transform of the voltage waveform
             vt = [None] * N
@@ -230,7 +230,7 @@ class HarmonicBalance:
                 # set each voltage with its time-varying value
                 for j in range(N):
                     vsources[j].dc = vt[j][i]
-                    print('Vsource = {}'.format(vsources[j].dc))
+                    # print('Vsource = {}'.format(vsources[j].dc))
                 
                 # run DC analysis
                 dc = DC('HB.DC')
@@ -250,8 +250,10 @@ class HarmonicBalance:
                         port = (n1, n2)
                         n = nonlin_ports.index(port)
                         
-                        gt[n,n,i] = gt[n,n,i] + dev.gt
-                        it[n,n,i] = it[n,n,i] + dev.It
+                        gt[n,n,i] = gt[n,n,i] + dev.oppoint['gd'] #dev.gt
+                        it[n,n,i] = it[n,n,i] + dev.oppoint['Id'] #dev.It
+                        print(dev.oppoint['gd'])
+                        print(dev.oppoint['Id'])
 
             # compute the spectrum of each port conductance
             # TODO: generalize this section for 3-port devices
@@ -339,21 +341,21 @@ class HarmonicBalance:
                     Han[I:I+Kk,J:J+Kk] = Hmn
 
             dIdV = (Toe + Han) @ D
-            J = Y + dIdV + np.eye(W) * 1e-12        # + Omega * dQdV
-            F = Is + Y @ V + Ig                     # + j * Omega * Q
+            J = Y + dIdV         # + Omega * dQdV
+            F = Is + Y @ V + Ig  # + j * Omega * Q
             V = V - linalg.inv(J) @ F
 
-            np.set_printoptions(precision=2, suppress=False, linewidth=150)
-            # print('Is = {}'.format(Is))
-            # print('Ig = {}'.format(Ig))
-            print('Y = {}'.format(Y))
+            np.set_printoptions(precision=4, suppress=False, linewidth=150)
+            print('Is + YV = {}'.format(Is + Y @ V))
+            print('Ig = {}'.format(Ig))
+            # print('Y = {}'.format(Y))
             # print('G = {}'.format(G))
             # print('Toe = {}'.format(Toe))
             # print('Han = {}'.format(Han))
             # print('D = {}'.format(D))
-            print('dIdV = {}'.format(dIdV))
+            # print('dIdV = {}'.format(dIdV))
             # print('J = {}'.format(J))
-            # print('F = {}'.format(F))
+            print('F = {}'.format(F))
             print('V = {}'.format(V))
 
         # print(G[0,0,:])

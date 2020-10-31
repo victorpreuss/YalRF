@@ -77,13 +77,13 @@ class DC():
 
         # populate the matrices A and z with the linear devices stamps
         for dev in self.lin_devs:
-            idx = self.iidx[dev] if dev in self.iidx else None
+            idx = self.get_extra_row_idx(dev)
             dev.add_dc_stamps(A, z, None, idx)
 
         # TODO: add gmin only at problematic nodes such as middle of two
         #       capacitors or in parallel to pn junctions (high conductance) to
         #       prevent the occurence of a singular matrix.
-        A = A + np.eye(len(A)) * self.options['gmin']
+        A = A # + np.eye(len(A)) * self.options['gmin']
 
         # if there is not a nonlinear device, simply solve the linear system
         if not self.nonlin_devs:
@@ -268,7 +268,7 @@ class DC():
                 alpha = alpha - alpha_delta / 2
                 alpha_delta = alpha_delta / 2
 
-                if alpha > alpha_min:
+                if alpha < alpha_min:
                     converged = False
                     break
             k = k + 1

@@ -101,7 +101,7 @@ class Diode():
 
         Vd = self.oppoint['Vd']
         Id = self.oppoint['Id']
-        gd = self.oppoint['gd']
+        gd = self.oppoint['gd'] + 1e-12
         Rs = self.adjusted_options['Rs']
 
         # add effect of series resistance
@@ -300,11 +300,11 @@ class Diode():
         N = self.options['N']
 
         # limiting schemes
-        Vcrit = N * Vt * np.log(N * Vt / (np.sqrt(2.) * Is))
-        if (Vd > 0. and Vd > Vcrit):
-            Vd = self.Vdold +  N * Vt * np.log1p((Vd - self.Vdold) / (N * Vt))
+        # Vcrit = N * Vt * np.log(N * Vt / (np.sqrt(2.) * Is))
+        # if (Vd > 0. and Vd > Vcrit):
+        #     Vd = self.Vdold +  N * Vt * np.log1p((Vd - self.Vdold) / (N * Vt))
 
-        # Vd = self.Vdold + 10. * N * Vt * np.tanh((Vd - self.Vdold) / (10. * N * Vt))
+        Vd = self.Vdold + 10. * N * Vt * np.tanh((Vd - self.Vdold) / (10. * N * Vt))
         self.Vdold = Vd
 
         return Vd
@@ -364,4 +364,4 @@ class Diode():
 
 # limit the maximum derivative of the exponential function
 def exp_lim(x):
-    return np.exp(x) if x < 70. else np.exp(70.) + np.exp(70.) * (x - 70.)
+    return np.exp(x) if x < 700. else np.exp(700.) + np.exp(700.) * (x - 700.)
