@@ -101,7 +101,7 @@ class Diode():
 
         Vd = self.oppoint['Vd']
         Id = self.oppoint['Id']
-        gd = self.oppoint['gd'] + 1e-12
+        gd = self.oppoint['gd']
         Rs = self.adjusted_options['Rs']
 
         # add effect of series resistance
@@ -258,8 +258,8 @@ class Diode():
             gbr = Ibv / Vt * exp_lim(- (Bv + Vd) / Vt)
 
         # diode total current
-        Id = Idf + Idr + Ibr
-        gd = gdf + gdr + gbr
+        Id = Idf + Idr + Ibr + (Vd * 1e-12)
+        gd = gdf + gdr + gbr + (1e-12)
 
         self.oppoint['Vd'] = Vd
         self.oppoint['Id'] = Id

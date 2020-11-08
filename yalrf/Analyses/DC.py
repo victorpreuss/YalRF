@@ -81,9 +81,10 @@ class DC():
             dev.add_dc_stamps(A, z, None, idx)
 
         # TODO: add gmin only at problematic nodes such as middle of two
-        #       capacitors or in parallel to pn junctions (high conductance) to
-        #       prevent the occurence of a singular matrix.
-        A = A # + np.eye(len(A)) * self.options['gmin']
+        #       capacitors or in parallel to pn junctions (high conductance)
+        #       to prevent the occurence of a singular matrix.
+        for i in range(self.n):
+            A[i,i] = A[i,i] + self.options['gmin']
 
         # if there is not a nonlinear device, simply solve the linear system
         if not self.nonlin_devs:
@@ -100,18 +101,18 @@ class DC():
             logger.info('Finished DC analysis.')
             return self.x
 
-        # solve DC analysis using the gmin stepping continuation method
-        if self.options['use_gmin_stepping'] == True:
-            logger.info('Previous solver failed! Using gmin stepping ...')
-            issolved = self.solve_dc_nonlinear_using_gmin_stepping(A, z, x0)
-            if issolved:
-                logger.info('Finished DC analysis.')
-                return self.x
-
         # solve DC analysis using the source stepping continuation method
         if self.options['use_source_stepping'] == True:
             logger.info('Previous solver failed! Using source stepping ...')
             issolved = self.solve_dc_nonlinear_using_source_stepping(A, z, x0)
+            if issolved:
+                logger.info('Finished DC analysis.')
+                return self.x
+
+        # solve DC analysis using the gmin stepping continuation method
+        if self.options['use_gmin_stepping'] == True:
+            logger.info('Previous solver failed! Using gmin stepping ...')
+            issolved = self.solve_dc_nonlinear_using_gmin_stepping(A, z, x0)
             if issolved:
                 logger.info('Finished DC analysis.')
                 return self.x
@@ -203,7 +204,9 @@ class DC():
         k = 0
         while (not converged) and (k < gmin_maxiter):
             # add (decreasing) conductance from every node to 'gnd'
-            An = A + np.eye(len(A)) * gmin
+            An = A.copy()
+            for i in range(self.n):
+                An[i,i] = An[i,i] + gmin
 
             # solve for this 'augmented' circuit using previous solution
             issolved = self.solve_dc_nonlinear(An, z, self.x)
@@ -216,7 +219,7 @@ class DC():
                     converged = True
                 else:
                     gmin = gmin * gmin_rate
-                    gmin_rate = gmin_rate / 2
+                    gmin_rate = gmin_rate / 4
             else:
                 self.x = xprev # restore backup of good solution
 
