@@ -26,165 +26,72 @@ class HarmonicBalance:
         nonlin_devs = netlist.get_nonlinear_devices()
         iidx = netlist.get_mna_extra_rows_dict()
 
-        """ Get nonlinear and voltage source ports """
+        np.set_printoptions(precision=4, suppress=False, linewidth=150)
 
-        # get list of differential ports of the nonlinear subcircuit
-        nonlin_ports = []
-        for dev in nonlin_devs:
-            if isinstance(dev, Diode):
-                port = (dev.n1, dev.n2)
-                if port not in nonlin_ports:
-                    nonlin_ports.append(port)
-            # elif isinstance(dev, BJT):
-            #     nonlin_ports.append((dev.n1, dev.n3))
-            #     nonlin_ports.append((dev.n2, dev.n3))
+        """ Get basic lengths """
 
-        # get list of differential ports of input voltage sources
-        # also get voltage source values at DC and first harmonic
-        Vs_dc = []
-        Vs_ac = []
-        vsource_ports = []
-        for dev in lin_devs:
-            if isinstance(dev, VoltageSource):
-                port = (dev.n1, dev.n2)
-                if port not in nonlin_ports:
-                    vsource_ports.append(port)
-                Vs_dc.append(dev.dc)
-                Vs_ac.append(dev.ac)
-        Vs = [np.array([Vs_dc]).T, np.array([Vs_ac]).T]
+        K = self.numharmonics           # frequency of the 1st harmonic
+        M = netlist.get_num_vsources()  # number of voltage sources
+        N = netlist.get_num_nodes() - 1 # total number of nodes in the netlist without 'gnd'
 
-        """ Get basic information """
-
-        K = self.numharmonics       # frequency of the 1st harmonic
-        L = netlist.get_num_nodes() # total number of nodes in the netlist
-        M = len(vsource_ports)      # number of voltage source ports
-        N = len(nonlin_ports)       # number of nonlinear ports
-
-        Kk = 2 * (K + 1)            # size of block matrices in the system
-        W = Kk * N                  # total size of the matrix system 2 * (K+1) * N
+        Kk = 2 * (K + 1)                # size of block matrices in the system
+        W = Kk * N                      # total size of the matrix system 2 * (K+1) * N
         
-        T = 1. / self.freq          # period of the 1st harmonic
-        dt = T / (4. * K)           # timestep in the transient waveform
-        w1 = 2 * np.pi * self.freq  # angular frequency of the 1st harmonic
+        T = 1. / self.freq              # period of the 1st harmonic
+        w1 = 2 * np.pi * self.freq      # angular frequency of the 1st harmonic
 
-        # time array (oversampled 2x)
-        time = np.linspace(0, T, 4 * K, endpoint=False)
+        S = 2 * (K + 1) - 1             # time array length for DFT/IDFT
+        dt = T / S                      # timestep in the transient waveform
 
         # array with the Kth harmonic frequencies
         freqs = self.freq * np.linspace(0, K, K+1)
 
-        """ Assembly of nonlinear subcircuit """
+        """ Independent current sources (Is) """
 
-        # create nonlinear subcircuit netlist
-        nonlin_netlist = Netlist('Netlist of the nonlinear subciruit')
-        for dev in nonlin_devs:
-            if isinstance(dev, Diode):
-                # get diode node names from full netlist
-                n1_name = netlist.get_node_name(dev.n1)
-                n2_name = netlist.get_node_name(dev.n2)
+        Is = np.zeros((W, 1))
+        for dev in lin_devs:
+            if isinstance(dev, CurrentSource):
+                iac = dev.ac * np.exp(1j * dev.phase)
+                n = dev.n1 - 1
+                Is[Kk*n+0] = dev.dc
+                Is[Kk*n+1] = 0.
+                Is[Kk*n+2] = iac.real / 2.
+                Is[Kk*n+3] = iac.imag / 2.
 
-                # add the diode to the new netlist
-                n1 = nonlin_netlist.add_node(n1_name)
-                n2 = nonlin_netlist.add_node(n2_name)
-
-                diode = Diode(dev.name, n1, n2)
-                diode.options = dev.options
-                nonlin_netlist.devices.append(diode)
-            
-            # TODO: generalize this for 3-port devices also
-
-        # add a voltage source to each port of the nonlinear subcircuit
-        vsources = []
-        for port in nonlin_ports:
-            n1_name = netlist.get_node_name(port[0])
-            n2_name = netlist.get_node_name(port[1])
-            
-            vname = 'V_' + n1_name + '_' + n2_name
-            v = nonlin_netlist.add_vdc(vname, n1_name, n2_name, 0)
-            vsources.append(v)
-
-        # get nonlinear subcircuits device list
-        nldevs = nonlin_netlist.get_nonlinear_devices()
+        print('Is = {}'.format(Is))
 
         """ Transadmittance matrix (Y) """
 
-        # create MNA matrices for linear subcircuit
-        A = np.zeros((L, L), dtype=complex)
-        C = np.zeros((N+M, L), dtype=complex)
+        Y = np.zeros((W, W))
+        for k in range(K+1):
 
-        Yvs = [] # relates voltage source to interconnection current
-        Ynl = [] # relates interconnection voltage to interconnection current
-        for freq in freqs:
-            # refresh matrices
-            A[:,:] = 0.
-            C[:,:] = 0.
+            # add ground node
+            Yk = np.zeros((N+1, N+1), dtype=complex)
 
             # add currently supported devices stamps
             for dev in lin_devs:
                 if isinstance(dev, (Resistor, Capacitor, Inductor)):
-                    dev.add_ac_stamps(A, None, None, None, freq)
+                    dev.add_ac_stamps(Yk, None, None, None, freqs[k])
 
-            k = 0
-            for node in nonlin_ports + vsource_ports:
-                # get nodes
-                n1 = node[0]
-                n2 = node[1]
+            # remove ground node
+            Yk = Yk[1:,1:]
 
-                # add to connexion matrix 
-                C[k,n1] = +1.
-                C[k,n2] = -1.
-
-                # add 100 ohms resistor in parallel with nonlinear or vsource devices
-                g = 0.01 
-                A[n1][n1] = A[n1][n1] + g
-                A[n2][n2] = A[n2][n2] + g
-                A[n1][n2] = A[n1][n2] - g
-                A[n2][n1] = A[n2][n1] - g
-                
-                k = k + 1
-
-            # remove ground nodes
-            An = A[1:,1:]
-            Cn = C[:,1:]
-
-            # calculate transimpedance and transdmittance matrices
-            Ztrans = Cn @ linalg.pinv(An) @ Cn.transpose()
-            Ytrans = linalg.pinv(Ztrans) - np.eye(N+M) * 0.01
-
-            # split the transadmittance matrix between nonlinear and voltage source ports
-            Yvs.append(Ytrans[:N,N:]) # (NxM)
-            Ynl.append(Ytrans[:N,:N]) # (NxN)
-
-        # form the Y matrix based on Ynl
-        Y = np.zeros((W, W))
-        for i in range(N):
-            for j in range(N):
-                for k in range(K+1):
+            # populate the Y matrix using Yk
+            for i in range(N):
+                for j in range(N):
                     # get the Ymnk 2x2 matrix
                     Ymnk = np.zeros((2,2))
-                    Ymnk[0,0] = +Ynl[k][i,j].real
-                    Ymnk[0,1] = -Ynl[k][i,j].imag
-                    Ymnk[1,0] = +Ynl[k][i,j].imag
-                    Ymnk[1,1] = +Ynl[k][i,j].real
+                    Ymnk[0,0] = +Yk[i,j].real
+                    Ymnk[0,1] = -Yk[i,j].imag
+                    Ymnk[1,0] = +Yk[i,j].imag
+                    Ymnk[1,1] = +Yk[i,j].real
 
                     # put it in the Y matrix
                     I = Kk * i + 2 * k
                     J = Kk * j + 2 * k
                     Y[I:I+2,J:J+2] = Ymnk
-                            
-        """ Interconnection current created by voltage sources (Is) """
 
-        Itempdc = Yvs[0] @ Vs[0] # dc
-        Itempac = Yvs[1] @ Vs[1] # 1st harmonic
-
-        Is = np.zeros((W, 1))
-        for i in range(N):
-            Is[Kk*i+0] = Itempdc[i].real
-            Is[Kk*i+1] = Itempdc[i].imag
-            Is[Kk*i+2] = Itempac[i].real
-            Is[Kk*i+3] = Itempac[i].imag
-
-        # Is = Is / (2 * K)
+        print('Y = {}'.format(Y))
         
         """ Initial voltage estimative for each port (V) """
 
@@ -194,82 +101,104 @@ class HarmonicBalance:
         vac = ac.get_ac_solution()
         vdc = ac.get_dc_solution()
 
-        # add 'gnd' node
-        vdc = np.insert(vdc, 0, 0, axis=0)
-        vac = np.insert(vac, 0, 0, axis=1)
-
         V = np.zeros((W, 1))
         for i in range(N):
-            port = nonlin_ports[i]
-            V[Kk*i] = vdc[port[0]] - vdc[port[1]]
-            for k in range(1):
-                vport = vac[k,port[0]] - vac[k,port[1]]
-                V[Kk*i+2*(k+1)+0] = vport.real
-                V[Kk*i+2*(k+1)+1] = vport.imag
+            V[Kk*i] = vdc[i]
+            for k in range(1, 2):#(1, K+1):
+                vport = vac[k,i]
+                V[Kk*i+2*k+0] = vport.real / 2.
+                V[Kk*i+2*k+1] = vport.imag / 2.
 
-        for a in range(10): # run 10 iterations of HB
+        V = np.array([[-0.2],
+                      [0],
+                      [0],
+                      [0.7],
+                      [0.15],
+                      [0],
+                      [0],
+                      [0.06],
+                      [0],
+                      [0],
+                      [0],
+                      [0]])
+
+        print('V = {}'.format(V))
+
+        for a in range(20): # run 10 iterations of HB
 
             """ Time-domain v(t) """
 
-            # inverse fourier transform of the voltage waveform
-            vt = [None] * N
+            vt = np.zeros((N, S))
             for i in range(N):
+
+                # assemble complex array of spectra for port 'i'
                 vf = np.zeros(K+1, dtype=complex)
                 for k in range(K+1):
                     vf[k] = V[Kk*i+2*k+0] + 1j * V[Kk*i+2*k+1]
-                vt[i] = scipy.fft.irfft(vf, 4 * K) * (2 * K)
+
+                # compute inverse fourier transform of voltage waveform
+                for s in range(S):
+                    vt[i,s] = vf[0].real
+                    for k in range(1, K+1):
+                        vt[i,s] = vt[i,s] + 2 * (vf[k].real * np.cos(2. * np.pi * k * s / S) -
+                                                 vf[k].imag * np.sin(2. * np.pi * k * s / S))
+
+                # plt.plot(vt[0,:])
+                # plt.show()
 
             """ Time-domain g(t) and i(t) waveforms """
 
             # run a time-varying DC analysis to get the small-signal conductances over time
             # TODO: wasting memory here (and also everywhere else)
-            gt = np.zeros((N, N, len(time)))
-            it = np.zeros((N, N, len(time)))
-            for i in range(len(time)):
+            gt = np.zeros((N, N, S))
+            it = np.zeros((N, N, S))
 
-                # set each voltage with its time-varying value
-                for j in range(N):
-                    vsources[j].dc = vt[j][i]
-                    # print('Vsource = {}'.format(vsources[j].dc))
-                
-                # run DC analysis
-                dc = DC('HB.DC')
-                dc.run(nonlin_netlist)
+            dev = nonlin_devs[0]
+            #dev.init()
 
-                # get the conductances from DC oppoint
-                # TODO: generalize this section for 3-port devices
-                for k in range(len(nldevs)):
-                    dev = nldevs[k]
+            for s in range(S):
+                for dev in nonlin_devs:
                     if isinstance(dev, Diode):
-                        n1_name = nonlin_netlist.get_node_name(dev.n1)
-                        n2_name = nonlin_netlist.get_node_name(dev.n2)
+                        #dev.init()
+                        dev.calc_oppoint(vt[:,s])
 
-                        n1 = netlist.get_node_idx(n1_name)
-                        n2 = netlist.get_node_idx(n2_name)
+                        n1 = dev.n1-1
+                        n2 = dev.n2-1
 
-                        port = (n1, n2)
-                        n = nonlin_ports.index(port)
+                        if n1 >= 0:
+                            gt[n1,n1,s] = gt[n1,n1,s] + dev.oppoint['gd']
+                            it[n1,n1,s] = it[n1,n1,s] + dev.oppoint['Id']
+
+                        if n2 >= 0:
+                            gt[n2,n2,s] = gt[n2,n2,s] + dev.oppoint['gd']
+                            it[n2,n2,s] = it[n2,n2,s] - dev.oppoint['Id']
                         
-                        gt[n,n,i] = gt[n,n,i] + dev.oppoint['gd'] #dev.gt
-                        it[n,n,i] = it[n,n,i] + dev.oppoint['Id'] #dev.It
-                        print(dev.oppoint['gd'])
-                        print(dev.oppoint['Id'])
+            print('vt = {}'.format(vt))
+            print('gt = {}'.format(gt))
+            print('it = {}'.format(it))
 
             # compute the spectrum of each port conductance
-            # TODO: generalize this section for 3-port devices
             G = np.zeros((N, N, K+1), dtype=complex)
             for i in range(N):
-                G[i,i,:] = scipy.fft.rfft(gt[i,i,:])[:K+1] / (8 * K)
+                for k in range(K+1):
+                    for s in range(S):
+                        G[i,i,k] = G[i,i,k] + gt[i,i,s] * (np.cos(2. * np.pi * k * s / S) -
+                                                        1j * np.sin(2. * np.pi * k * s / S))
+                    G[i,i,k] = G[i,i,k] / S
 
             """ Nonlinear current (Ig) """
 
             # TODO: generalize this section for 3-port devices
             Ig = np.zeros((W, 1))
             for i in range(N):
-                iportf = scipy.fft.rfft(it[i,i,:])[:K+1] / (8 * K)
                 for k in range(K+1):
-                    Ig[Kk*i+2*k] = iportf[k].real
-                    Ig[Kk*i+2*k+1] = iportf[k].imag
+                    Igk = 0 + 1j*0
+                    for s in range(S):
+                        Igk = Igk + it[i,i,s] * (np.cos(2. * np.pi * k * s / S) -
+                                                 1j * np.sin(2. * np.pi * k * s / S))
+                    Igk = Igk / S
+                    Ig[Kk*i+2*k] = Igk.real
+                    Ig[Kk*i+2*k+1] = Igk.imag
 
             """ Creating the dIdV matrix from G(jw) """
 
@@ -343,29 +272,56 @@ class HarmonicBalance:
             dIdV = (Toe + Han) @ D
             J = Y + dIdV         # + Omega * dQdV
             F = Is + Y @ V + Ig  # + j * Omega * Q
-            V = V - linalg.inv(J) @ F
 
-            np.set_printoptions(precision=4, suppress=False, linewidth=150)
-            print('Is + YV = {}'.format(Is + Y @ V))
+            for i in range(N):
+                k = Kk * i
+                J[k+1,k+1] = 1.
+
+            # print('Is = {}'.format(Is))
+            print('Y = {}'.format(Y))
+            print('V = {}'.format(V))
+            print('YV = {}'.format(Y @ V))
             print('Ig = {}'.format(Ig))
-            # print('Y = {}'.format(Y))
+            print('F = {}'.format(F))
             # print('G = {}'.format(G))
             # print('Toe = {}'.format(Toe))
             # print('Han = {}'.format(Han))
             # print('D = {}'.format(D))
             # print('dIdV = {}'.format(dIdV))
-            # print('J = {}'.format(J))
-            print('F = {}'.format(F))
+            print('J = {}'.format(J))
             print('V = {}'.format(V))
 
-        # print(G[0,0,:])
-        # print(G[1,1,:])
+            V = V - linalg.inv(J) @ F
+            print('V = {}'.format(V))
 
-        # plt.figure()
-        # plt.subplot(121)
-        # plt.plot(gt[0,0])
-        # plt.grid()
-        # plt.subplot(122)
-        # plt.stem(abs(G[0,0]), use_line_collection=True)
-        # plt.grid()
-        # plt.show()
+        # assemble complex array of spectra for node 'i'
+        i = 0
+        vf = np.zeros(K+1, dtype=complex)
+        for k in range(K+1):
+            vf[k] = V[Kk*i+2*k+0] + 1j * V[Kk*i+2*k+1]
+
+        # compute inverse fourier transform of voltage waveform
+        S = 4 * K
+        vt = np.zeros(S)
+        for s in range(S):
+            vt[s] = vf[0].real
+            for k in range(1, K+1):
+                vt[s] = vt[s] + 2 * (vf[k].real * np.cos(2. * np.pi * k * s / S) -
+                                     vf[k].imag * np.sin(2. * np.pi * k * s / S))
+
+        vt_plot1 = vt.copy()
+        vf_plot1 = vf.copy()
+        
+        plt.figure()
+        plt.subplot(121)
+        plt.plot(vt_plot1)
+        plt.grid()
+        plt.subplot(122)
+        plt.stem(freqs, abs(vf_plot1), use_line_collection=True, markerfmt='^')
+        for f, v in zip(freqs, vf_plot1):
+            label = "({:.3f})".format(abs(v))
+            plt.annotate(label, (f,abs(v)), textcoords="offset points", xytext=(0,10), ha='center')
+        plt.grid()
+        plt.show()
+
+
