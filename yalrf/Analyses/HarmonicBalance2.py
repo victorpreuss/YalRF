@@ -93,7 +93,6 @@ class HarmonicBalance2:
                 diode = Diode(dev.name, n1, n2)
                 diode.options = dev.options
                 nonlin_netlist.devices.append(diode)
-            
             # TODO: generalize this for 3-port devices also
 
         # add a voltage source to each port of the nonlinear subcircuit
@@ -239,32 +238,32 @@ class HarmonicBalance2:
                     V[Kk*i+2*k+1] = vk.imag
 
         # Forced good initial condition
-        V = np.array([[-3.0241e-01],
-            [ 0.0000e+00],
-            [ 6.2560e-04],
-            [-7.3801e-01],
-            [ 1.6367e-01],
-            [-1.0291e-04],
-            [ 8.3063e-04],
-            [-5.9465e-02],
-            [ 5.9560e-03],
-            [-5.3677e-04],
-            [ 9.1949e-04],
-            [-2.1654e-02],
-            [-8.2171e-03],
-            [-1.3999e-03],
-            [ 3.7401e-04],
-            [-6.0768e-03],
-            [-7.4935e-03],
-            [-2.3699e-03],
-            [-1.2872e-03],
-            [ 5.4917e-04],
-            [-4.1727e-03],
-            [-2.5829e-03]])
+        # V = np.array([[-3.0241e-01],
+        #     [ 0.0000e+00],
+        #     [ 6.2560e-04],
+        #     [-7.3801e-01],
+        #     [ 1.6367e-01],
+        #     [-1.0291e-04],
+        #     [ 8.3063e-04],
+        #     [-5.9465e-02],
+        #     [ 5.9560e-03],
+        #     [-5.3677e-04],
+        #     [ 9.1949e-04],
+        #     [-2.1654e-02],
+        #     [-8.2171e-03],
+        #     [-1.3999e-03],
+        #     [ 3.7401e-04],
+        #     [-6.0768e-03],
+        #     [-7.4935e-03],
+        #     [-2.3699e-03],
+        #     [-1.2872e-03],
+        #     [ 5.4917e-04],
+        #     [-4.1727e-03],
+        #     [-2.5829e-03]])
 
         print('V = {}'.format(V))
 
-        for a in range(20): # run 20 iterations of HB
+        for a in range(15): # run 20 iterations of HB
 
             """ Time-domain v(t) """
 
@@ -441,6 +440,7 @@ class HarmonicBalance2:
             print('V = {}'.format(V))
 
         # assemble complex array of spectra for port 'i'
+        i = 0
         vf = np.zeros(K+1, dtype=complex)
         for k in range(K+1):
             vf[k] = V[Kk*i+2*k+0] + 1j * V[Kk*i+2*k+1]

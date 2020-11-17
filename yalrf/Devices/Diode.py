@@ -227,8 +227,8 @@ class Diode():
         Vt = k * T / e
 
         # get diode voltage
-        V1 = x[self.n1-1,0] if self.n1 > 0 else 0.
-        V2 = x[self.n2-1,0] if self.n2 > 0 else 0.
+        V1 = x[self.n1-1] if self.n1 > 0 else 0.
+        V2 = x[self.n2-1] if self.n2 > 0 else 0.
 
         # remove voltage drop caused by series resistance
         Vtot = V1 - V2
