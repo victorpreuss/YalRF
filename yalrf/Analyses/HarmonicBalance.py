@@ -9,7 +9,6 @@ from yalrf.Utils import hb_logger as logger
 import logging
 logger.setLevel(logging.INFO)
 
-import scipy.fft
 import matplotlib.pyplot as plt
 
 class HarmonicBalance:
@@ -124,8 +123,8 @@ class HarmonicBalance:
             for s in range(S):
                 vt[s] = vf[0].real + 2 * (vf[1].real * np.cos(2. * np.pi * 1 * s / S) -
                                           vf[1].imag * np.sin(2. * np.pi * 1 * s / S))
-                vt[s] = min([vt[s], +0.1])
-                vt[s] = max([vt[s], -0.1])
+                vt[s] = min([vt[s], +0.4])
+                vt[s] = max([vt[s], -0.4])
 
             # plt.plot(vt)
             # plt.show()
@@ -149,6 +148,15 @@ class HarmonicBalance:
         # operating points can be obtained via DC simulation.
         nonlin_netlist = Netlist('HB.Netlist')
 
+        # add a voltage source to each node of the netlist
+        vsources = []
+        for n in range(N):#nonlin_netlist.get_num_nodes()):
+            n1_name = netlist.get_node_name(n+1)
+            vname = 'V_' + n1_name + '_gnd'
+            v = nonlin_netlist.add_vdc(vname, n1_name, 'gnd', 0)
+            vsources.append(v)
+            print(v)
+
         # add new instance of each nonlinear device to the netlist
         for dev in nonlin_devs:
             if isinstance(dev, Diode):
@@ -164,25 +172,33 @@ class HarmonicBalance:
                 diode.options = dev.options
                 nonlin_netlist.devices.append(diode)
 
-        # add a voltage source to each node of the netlist
-        vsources = []
-        for n in range(1, nonlin_netlist.get_num_nodes()):
-            n1_name = netlist.get_node_name(n)
-            vname = 'V_' + n1_name + '_gnd'
-            v = nonlin_netlist.add_vdc(vname, n1_name, 'gnd', 0)
-            vsources.append(v)
+            elif isinstance(dev, BJT):
+                # get bjt node names from full netlist
+                n1_name = netlist.get_node_name(dev.n1)
+                n2_name = netlist.get_node_name(dev.n2)
+                n3_name = netlist.get_node_name(dev.n3)
+
+                # add the diode to the new netlist
+                B = nonlin_netlist.add_node(n1_name)
+                C = nonlin_netlist.add_node(n2_name)
+                E = nonlin_netlist.add_node(n3_name)
+
+                bjt = BJT(dev.name, B, C, E)
+                bjt.options = dev.options
+                nonlin_netlist.devices.append(bjt)
+
 
         # get nonlinear device list from new netlist
         nldevs = nonlin_netlist.get_nonlinear_devices()
 
-        for a in range(50): # run 10 iterations of HB
+        for a in range(20): # run 20 iterations of HB
 
             """ Time-domain v(t) """
 
             vt = np.zeros((N, S))
             for i in range(N):
 
-                # assemble complex array of spectra for port 'i'
+                # assemble complex array of spectra for node 'i'
                 vf = np.zeros(K+1, dtype=complex)
                 for k in range(K+1):
                     vf[k] = V[Kk*i+2*k+0] + 1j * V[Kk*i+2*k+1]
@@ -194,7 +210,7 @@ class HarmonicBalance:
                         vt[i,s] = vt[i,s] + 2 * (vf[k].real * np.cos(2. * np.pi * k * s / S) -
                                                  vf[k].imag * np.sin(2. * np.pi * k * s / S))
 
-                # plt.plot(vt[0,:])
+                # plt.plot(vt[i,:])
                 # plt.show()
 
             """ Time-domain g(t) and i(t) waveforms """
@@ -230,6 +246,33 @@ class HarmonicBalance:
                         if n2 >= 0:
                             gt[n2,n2,s] = gt[n2,n2,s] + dev.oppoint['gd']
                             it[n2,n2,s] = it[n2,n2,s] - dev.oppoint['Id']
+
+                    if isinstance(dev, BJT):
+                        n1_name = nonlin_netlist.get_node_name(dev.n1)
+                        n2_name = nonlin_netlist.get_node_name(dev.n2)
+                        n3_name = nonlin_netlist.get_node_name(dev.n3)
+
+                        B = netlist.get_node_idx(n1_name) - 1
+                        C = netlist.get_node_idx(n2_name) - 1
+                        E = netlist.get_node_idx(n3_name) - 1
+
+                        if B >= 0:
+                            gt[B,B,s] = gt[B,B,s] + dev.oppoint['gmu'] + dev.oppoint['gpi']
+                            it[B,B,s] = it[B,B,s] + dev.oppoint['Ib']
+
+                        if C >= 0:
+                            gt[C,C,s] = gt[C,C,s] + dev.oppoint['gmu']
+                            it[C,C,s] = it[C,C,s] + dev.oppoint['Ic']
+
+                        if E >= 0:
+                            gt[E,E,s] = gt[E,E,s] + dev.oppoint['gpi']
+                            it[E,E,s] = it[E,E,s] - dev.oppoint['Ie']
+
+                        if E >= 0 and B >= 0:
+                            gt[E,B,s] = gt[E,B,s] + dev.oppoint['gmf'] - dev.oppoint['gmr']
+
+                        if C >= 0 and B >= 0:
+                            gt[C,B,s] = gt[C,B,s] + dev.oppoint['gmf'] - dev.oppoint['gmr']
                         
             print('vt = {}'.format(vt))
             print('gt = {}'.format(gt))
@@ -238,11 +281,12 @@ class HarmonicBalance:
             # compute the spectrum of each port conductance
             G = np.zeros((N, N, K+1), dtype=complex)
             for i in range(N):
-                for k in range(K+1):
-                    for s in range(S):
-                        G[i,i,k] = G[i,i,k] + gt[i,i,s] * (np.cos(2. * np.pi * k * s / S) -
-                                                        1j * np.sin(2. * np.pi * k * s / S))
-                    G[i,i,k] = G[i,i,k] / S
+                for j in range(N):
+                    for k in range(K+1):
+                        for s in range(S):
+                            G[i,j,k] = G[i,j,k] + gt[i,j,s] * (np.cos(2. * np.pi * k * s / S) -
+                                                          1j * np.sin(2. * np.pi * k * s / S))
+                        G[i,j,k] = G[i,j,k] / S
 
             """ Nonlinear current (Ig) """
 
@@ -352,35 +396,7 @@ class HarmonicBalance:
             V = V - linalg.inv(J) @ F
             print('V = {}'.format(V))
 
-        # assemble complex array of spectra for node 'i'
-        i = 2
-        j = 0
-        vf = np.zeros(K+1, dtype=complex)
-        for k in range(K+1):
-            vf[k] = (V[Kk*i+2*k+0] + 1j * V[Kk*i+2*k+1])# - (V[Kk*j+2*k+0] + 1j * V[Kk*j+2*k+1])
+        return V
 
-        # compute inverse fourier transform of voltage waveform
-        S = 8 * K
-        vt = np.zeros(S)
-        for s in range(S):
-            vt[s] = vf[0].real
-            for k in range(1, K+1):
-                vt[s] = vt[s] + 2 * (vf[k].real * np.cos(2. * np.pi * k * s / S) -
-                                     vf[k].imag * np.sin(2. * np.pi * k * s / S))
-
-        vt_plot1 = vt.copy()
-        vf_plot1 = vf.copy()
-        
-        plt.figure()
-        plt.subplot(211)
-        plt.plot(vt_plot1)
-        plt.grid()
-        plt.subplot(212)
-        plt.stem(freqs, abs(vf_plot1), use_line_collection=True, markerfmt='^')
-        for f, v in zip(freqs, vf_plot1):
-            label = "({:.3f}, {:.1f})".format(abs(v), np.degrees(np.angle(v)))
-            plt.annotate(label, (f,abs(v)), textcoords="offset points", xytext=(0,10), ha='center')
-        plt.grid()
-        plt.show()
 
 
