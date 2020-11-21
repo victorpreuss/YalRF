@@ -51,7 +51,7 @@ for ib in ibsweep:
     ic_yalrf.append(ic)
 
 # get output from Xyce
-xyce = np.array(getXyceData('tests/data/circuit4.prn')[1][:])
+xyce = np.array(getXyceData('./data/circuit4.prn')[1][:])
 
 # number of sweep points in the base current
 sweeplength = 11
