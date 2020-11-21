@@ -21,4 +21,4 @@ d1.options['Area'] = 1
 
 hb = HarmonicBalance('HB1', 1e6, 10)
 
-x = hb.run(y)
+V = hb.run(y)
