@@ -109,92 +109,42 @@ class HarmonicBalance:
         ac.run(netlist)
         vac = ac.get_ac_solution()
         vdc = ac.get_dc_solution()
-        
-        V = np.zeros((W, 1))
 
+        V = np.zeros((W, 1))
+        vt = np.zeros((N, S))
         for i in range(N):
 
             vf = np.zeros(K+1, dtype=complex)
             vf[0] = vdc[i]
             for k in range(1, K+1):
                 vf[k] = vac[k-1,i]
+                vf[k] = 0 # remove effect of AC
 
-            vt = np.zeros((S, 1))
             for s in range(S):
-                vt[s] = vf[0].real + 2 * (vf[1].real * np.cos(2. * np.pi * 1 * s / S) -
-                                          vf[1].imag * np.sin(2. * np.pi * 1 * s / S))
-                vt[s] = min([vt[s], +0.4])
-                vt[s] = max([vt[s], -0.4])
+                vt[i,s] = vf[0].real + 2 * (vf[1].real * np.cos(2. * np.pi * 1 * s / S) -
+                                            vf[1].imag * np.sin(2. * np.pi * 1 * s / S))
+                # vt[i,s] = min([vt[i,s], +0.4])
+                # vt[i,s] = max([vt[i,s], -0.4])
 
-            # plt.plot(vt)
+            # plt.plot(vt[i,:])
             # plt.show()
 
-            for i in range(N):
-                for k in range(K+1):
-                    vk = 0
-                    for s in range(S):
-                        vk = vk + vt[s] * (np.cos(2. * np.pi * k * s / S) -
-                                           1j * np.sin(2. * np.pi * k * s / S))
-                    vk = vk / S
-                    V[Kk*i+2*k] += vk.real
-                    V[Kk*i+2*k+1] += vk.imag
+            for k in range(K+1):
+                vk = 0
+                for s in range(S):
+                    vk = vk + vt[i,s] * (np.cos(2. * np.pi * k * s / S) -
+                                         1j * np.sin(2. * np.pi * k * s / S))
+                vk = vk / S
+                V[Kk*i+2*k] += vk.real
+                V[Kk*i+2*k+1] += vk.imag
 
         print('V = {}'.format(V))
 
-        """ Assembly of nonlinear netlist """
-
-        # create a nonlinear netlist with DC voltage sources attached
-        # to all nodes and include the nonlinear devices so that their
-        # operating points can be obtained via DC simulation.
-        nonlin_netlist = Netlist('HB.Netlist')
-
-        # add a voltage source to each node of the netlist
-        vsources = []
-        for n in range(N):#nonlin_netlist.get_num_nodes()):
-            n1_name = netlist.get_node_name(n+1)
-            vname = 'V_' + n1_name + '_gnd'
-            v = nonlin_netlist.add_vdc(vname, n1_name, 'gnd', 0)
-            vsources.append(v)
-            print(v)
-
-        # add new instance of each nonlinear device to the netlist
-        for dev in nonlin_devs:
-            if isinstance(dev, Diode):
-                # get diode node names from full netlist
-                n1_name = netlist.get_node_name(dev.n1)
-                n2_name = netlist.get_node_name(dev.n2)
-
-                # add the diode to the new netlist
-                n1 = nonlin_netlist.add_node(n1_name)
-                n2 = nonlin_netlist.add_node(n2_name)
-
-                diode = Diode(dev.name, n1, n2)
-                diode.options = dev.options
-                nonlin_netlist.devices.append(diode)
-
-            elif isinstance(dev, BJT):
-                # get bjt node names from full netlist
-                n1_name = netlist.get_node_name(dev.n1)
-                n2_name = netlist.get_node_name(dev.n2)
-                n3_name = netlist.get_node_name(dev.n3)
-
-                # add the diode to the new netlist
-                B = nonlin_netlist.add_node(n1_name)
-                C = nonlin_netlist.add_node(n2_name)
-                E = nonlin_netlist.add_node(n3_name)
-
-                bjt = BJT(dev.name, B, C, E)
-                bjt.options = dev.options
-                nonlin_netlist.devices.append(bjt)
-
-
-        # get nonlinear device list from new netlist
-        nldevs = nonlin_netlist.get_nonlinear_devices()
-
-        for a in range(20): # run 20 iterations of HB
+        for a in range(40): # run 30 iterations of HB
 
             """ Time-domain v(t) """
 
+            vtold = vt.copy()
             vt = np.zeros((N, S))
             for i in range(N):
 
@@ -210,6 +160,7 @@ class HarmonicBalance:
                         vt[i,s] = vt[i,s] + 2 * (vf[k].real * np.cos(2. * np.pi * k * s / S) -
                                                  vf[k].imag * np.sin(2. * np.pi * k * s / S))
 
+                
                 # plt.plot(vt[i,:])
                 # plt.show()
 
@@ -217,63 +168,138 @@ class HarmonicBalance:
 
             # run a time-varying DC analysis to get the small-signal conductances over time
             # TODO: wasting memory here (and also everywhere else)
-            gt = np.zeros((N, N, S))
-            it = np.zeros((N, N, S))
+            gt = np.zeros((N+1, N+1, S))
+            it = np.zeros((N+1, S))
             for s in range(S):
 
-                # set each DC voltage with its time-varying value
-                for i in range(N):
-                    vsources[i].dc = vt[i,s]
-                    # print(vsources[i].name)
-
-                # run DC analysis
-                dc = DC('HB.DC')
-                dc.run(nonlin_netlist)
-
                 # get the conductances from DC oppoint
-                for dev in nldevs:
+                for dev in nonlin_devs:
                     if isinstance(dev, Diode):
-                        n1_name = nonlin_netlist.get_node_name(dev.n1)
-                        n2_name = nonlin_netlist.get_node_name(dev.n2)
 
-                        n1 = netlist.get_node_idx(n1_name) - 1
-                        n2 = netlist.get_node_idx(n2_name) - 1
+                        # get diode nodes
+                        n1 = dev.n1
+                        n2 = dev.n2
 
-                        if n1 >= 0:
-                            gt[n1,n1,s] = gt[n1,n1,s] + dev.oppoint['gd']
-                            it[n1,n1,s] = it[n1,n1,s] + dev.oppoint['Id']
+                        # need to get the correct previous voltage for limiting
+                        # TODO: unuderstande if this is needed
+                        v1old = vtold[n1-1,s] if n1 > 0 else 0
+                        v2old = vtold[n2-1,s] if n2 > 0 else 0
+                        Vdold = v1old - v2old
 
-                        if n2 >= 0:
-                            gt[n2,n2,s] = gt[n2,n2,s] + dev.oppoint['gd']
-                            it[n2,n2,s] = it[n2,n2,s] - dev.oppoint['Id']
+                        # calculate current over the diode
+                        v1 = vt[n1-1,s] if n1 > 0 else 0
+                        v2 = vt[n2-1,s] if n2 > 0 else 0
+                        Vd = v1 - v2
+
+                        Id = dev.get_i(Vd, Vdold)
+                        gd = dev.get_g(Vd, Vdold)
+
+                        # USING SECANT METHOD
+                        # Id2 = dev.get_i(Vd * 1.01, Vdold)
+                        # gd = (Id2 - Id) / (0.01 * Vd)
+
+                        gt[n1,n1,s] = gt[n1,n1,s] + gd
+                        gt[n2,n2,s] = gt[n2,n2,s] + gd
+                        gt[n1,n2,s] = gt[n1,n2,s] - gd
+                        gt[n2,n1,s] = gt[n2,n1,s] - gd
+
+                        it[n1,s] = it[n1,s] + Id
+                        it[n2,s] = it[n2,s] - Id
+
+                        # USING SECANT METHOD
+                        # # apply perturbation to node n1
+                        # if n1 >= 0:
+                        #     Vd1 = 1.01 * v1 - v2
+                        #     Id1 = dev.get_i(Vd1, Vdold)
+                        #     gd1 = (Id1 - Id) / (0.01 * v1)
+
+                        #     gt[n1,n1,s] = gt[n1,n1,s] + gd1
+                        #     it[n1,s] = it[n1,s] + Id
+
+                        #     if n2 >= 0:
+                        #         gt[n2,n1,s] = gt[n2,n1,s] - gd1
+
+                        # # apply perturbation to node n2
+                        # if n2 >= 0:
+                        #     Vd2 = v1 - 1.01 * v2
+                        #     Id2 = dev.get_i(Vd2, Vdold)
+                        #     gd2 = (Id2 - Id) / (- 0.01 * v2)
+
+                        #     gt[n2,n2,s] = gt[n2,n2,s] + gd2
+                        #     it[n2,s] = it[n2,s] - Id
+
+                        #     if n1 >= 0:
+                        #         gt[n1,n2,s] = gt[n1,n2,s] - gd2
 
                     if isinstance(dev, BJT):
-                        n1_name = nonlin_netlist.get_node_name(dev.n1)
-                        n2_name = nonlin_netlist.get_node_name(dev.n2)
-                        n3_name = nonlin_netlist.get_node_name(dev.n3)
 
-                        B = netlist.get_node_idx(n1_name) - 1
-                        C = netlist.get_node_idx(n2_name) - 1
-                        E = netlist.get_node_idx(n3_name) - 1
+                        # get BJT nodes
+                        B = dev.n1 
+                        C = dev.n2 
+                        E = dev.n3 
 
-                        if B >= 0:
-                            gt[B,B,s] = gt[B,B,s] + dev.oppoint['gmu'] + dev.oppoint['gpi']
-                            it[B,B,s] = it[B,B,s] + dev.oppoint['Ib']
+                        # calculate currents at the BJT
+                        Vb = vt[B-1,s] if B > 0 else 0
+                        Vc = vt[C-1,s] if C > 0 else 0
+                        Ve = vt[E-1,s] if E > 0 else 0
+                        Vs = 0
 
-                        if C >= 0:
-                            gt[C,C,s] = gt[C,C,s] + dev.oppoint['gmu']
-                            it[C,C,s] = it[C,C,s] + dev.oppoint['Ic']
+                        Ib, Ic, Ie = dev.get_i(Vb, Vc, Ve, Vs)
+                        gmu, gpi, gmf, gmr = dev.get_g(Vb, Vc, Ve, Vs)
 
-                        if E >= 0:
-                            gt[E,E,s] = gt[E,E,s] + dev.oppoint['gpi']
-                            it[E,E,s] = it[E,E,s] - dev.oppoint['Ie']
+                        gt[B,B,s] = gt[B,B,s] + gmu + gpi
+                        gt[B,C,s] = gt[B,C,s] - gmu
+                        gt[B,E,s] = gt[B,E,s] - gpi
+                        gt[C,B,s] = gt[C,B,s] - gmu + gmf + gmr
+                        gt[C,C,s] = gt[C,C,s] + gmu - gmr
+                        gt[C,E,s] = gt[C,E,s] - gmf
+                        gt[E,B,s] = gt[E,B,s] - gpi - gmf - gmr
+                        gt[E,C,s] = gt[E,C,s] + gmr
+                        gt[E,E,s] = gt[E,E,s] + gpi + gmf
 
-                        if E >= 0 and B >= 0:
-                            gt[E,B,s] = gt[E,B,s] + dev.oppoint['gmf'] - dev.oppoint['gmr']
+                        it[B,s] = it[B,s] + Ib
+                        it[C,s] = it[C,s] + Ic
+                        it[E,s] = it[E,s] - Ie
 
-                        if C >= 0 and B >= 0:
-                            gt[C,B,s] = gt[C,B,s] + dev.oppoint['gmf'] - dev.oppoint['gmr']
-                        
+                        # USING SECANT METHOD (need to understand better what to do here)
+                        # Ibn, Icn, Ien = dev.get_i(Vb * 1.01, Vc, Ve, Vs)
+
+                        # gbb = (Ibn - Ib) / (0.01 * Vb)
+                        # gcb = (Icn - Ic) / (0.01 * Vb)
+                        # geb = (Ien - Ie) / (0.01 * Vb)
+
+                        # gt[B,B,s] = gt[B,B,s] + gbb
+                        # gt[C,B,s] = gt[C,B,s] + gcb
+                        # gt[E,B,s] = gt[E,B,s] + geb
+
+                        # Ibn, Icn, Ien = dev.get_i(Vb, Vc * 1.01, Ve, Vs)
+
+                        # gcc = (Icn - Ic) / (0.01 * Vc)
+                        # gbc = (Ibn - Ib) / (0.01 * Vc)
+                        # gec = (Ien - Ie) / (0.01 * Vc)
+
+                        # gt[C,C,s] = gt[C,C,s] + gcc
+                        # gt[B,C,s] = gt[B,C,s] + gbc
+                        # gt[E,C,s] = gt[E,C,s] + gec
+
+                        # Ibn, Icn, Ien = dev.get_i(Vb, Vc, Ve * 1.01, Vs)
+
+                        # gee = (Ien - Ie) / (0.01 * Ve)
+                        # gbe = (Ibn - Ib) / (0.01 * Ve)
+                        # gce = (Icn - Ic) / (0.01 * Ve)
+
+                        # gt[E,E,s] = gt[E,E,s] + gee
+                        # gt[B,E,s] = gt[B,E,s] + gbe
+                        # gt[C,E,s] = gt[C,E,s] + gce
+
+                        # it[B,s] = it[B,s] + Ib
+                        # it[C,s] = it[C,s] + Ic
+                        # it[E,s] = it[E,s] - Ie
+
+            # remove ground node
+            gt = gt[1:,1:,:]
+            it = it[1:,:]
+
             print('vt = {}'.format(vt))
             print('gt = {}'.format(gt))
             print('it = {}'.format(it))
@@ -285,7 +311,7 @@ class HarmonicBalance:
                     for k in range(K+1):
                         for s in range(S):
                             G[i,j,k] = G[i,j,k] + gt[i,j,s] * (np.cos(2. * np.pi * k * s / S) -
-                                                          1j * np.sin(2. * np.pi * k * s / S))
+                                                               1j * np.sin(2. * np.pi * k * s / S))
                         G[i,j,k] = G[i,j,k] / S
 
             """ Nonlinear current (Ig) """
@@ -294,10 +320,10 @@ class HarmonicBalance:
             Ig = np.zeros((W, 1))
             for i in range(N):
                 for k in range(K+1):
-                    Igk = 0 + 1j*0
+                    Igk = complex()
                     for s in range(S):
-                        Igk = Igk + it[i,i,s] * (np.cos(2. * np.pi * k * s / S) -
-                                                 1j * np.sin(2. * np.pi * k * s / S))
+                        Igk = Igk + it[i,s] * (np.cos(2. * np.pi * k * s / S) -
+                                               1j * np.sin(2. * np.pi * k * s / S))
                     Igk = Igk / S
                     Ig[Kk*i+2*k] = Igk.real
                     Ig[Kk*i+2*k+1] = Igk.imag
@@ -381,7 +407,6 @@ class HarmonicBalance:
 
             print('Is = {}'.format(Is))
             print('Y = {}'.format(Y))
-            print('V = {}'.format(V))
             print('YV = {}'.format(Y @ V))
             print('Ig = {}'.format(Ig))
             print('F = {}'.format(F))
@@ -391,12 +416,27 @@ class HarmonicBalance:
             # print('D = {}'.format(D))
             # print('dIdV = {}'.format(dIdV))
             print('J = {}'.format(J))
-
-            print('V = {}'.format(V))
+            # print('V = {}'.format(V))
             V = V - linalg.inv(J) @ F
             print('V = {}'.format(V))
 
-        return V
+        S = 8 * K   # increase number of time samples
+        Vt = np.zeros((N, S))
+        Vf = np.zeros((N, K+1), dtype=complex)
+        for i in range(N):
+
+            # assemble complex array of spectra for node 'i'
+            for k in range(K+1):
+                Vf[i,k] = V[Kk*i+2*k+0] + 1j * V[Kk*i+2*k+1]
+
+            # compute inverse fourier transform of voltage waveform
+            for s in range(S):
+                Vt[i,s] = Vf[i,0].real
+                for k in range(1, K+1):
+                    Vt[i,s] = Vt[i,s] + 2 * (Vf[i,k].real * np.cos(2. * np.pi * k * s / S) -
+                                             Vf[i,k].imag * np.sin(2. * np.pi * k * s / S))
+
+        return freqs, Vf, Vt
 
 
 
