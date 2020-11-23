@@ -420,9 +420,105 @@ class BJT():
 
         return Vbe, Vbc
 
+    def get_i(self, Vb, Vc, Ve, Vs):
+        Vt  = k * self.options['Temp'] / e
+        Is  = self.adjusted_options['Is'] 
+        Nf  = self.options['Nf'] 
+        Nr  = self.options['Nr'] 
+        Ikf = self.adjusted_options['Ikf']
+        Ikr = self.adjusted_options['Ikr']
+        Vaf = self.options['Vaf']
+        Var = self.options['Var']
+        Ise = self.adjusted_options['Ise']
+        Ne  = self.options['Ne'] 
+        Isc = self.adjusted_options['Isc']
+        Nc  = self.options['Nc'] 
+        Bf  = self.options['Bf'] 
+        Br  = self.options['Br'] 
+
+        Vbe = Vb - Ve
+        Vbc = Vb - Vc
+        Vsc = Vs - Vc
+
+        gmin = 1e-12
+        
+        If = Is * (exp_lim(Vbe / (Nf * Vt)) - 1.)
+
+        Ibei = If / Bf
+        Iben = Ise * (exp_lim(Vbe / (Ne * Vt)) - 1.) + gmin * Vbe
+        Ibe  = Ibei + Iben
+
+        Ir = Is * (exp_lim(Vbc / (Nr * Vt)) - 1.)
+
+        Ibci = Ir / Br
+        Ibcn = Isc * (exp_lim(Vbc / (Nc * Vt)) - 1.) + gmin * Vbc
+        Ibc  = Ibci + Ibcn
+
+        Q1 = 1. / (1. - (Vbc / Vaf) - (Vbe / Var))
+        Q2 = (If / Ikf) + (Ir / Ikr)
+        Qb = (Q1 / 2.) * (1. + np.sqrt(1. + 4. * Q2))
+
+        It = (If - Ir) / Qb
+
+        Ib = Ibe + Ibc
+        Ic = It - Ibc
+        Ie = Ib + Ic
+
+        return Ib, Ic, Ie
+
+    def get_g(self, Vb, Vc, Ve, Vs):
+        Vt  = k * self.options['Temp'] / e
+        Is  = self.adjusted_options['Is'] 
+        Nf  = self.options['Nf'] 
+        Nr  = self.options['Nr'] 
+        Ikf = self.adjusted_options['Ikf']
+        Ikr = self.adjusted_options['Ikr']
+        Vaf = self.options['Vaf']
+        Var = self.options['Var']
+        Ise = self.adjusted_options['Ise']
+        Ne  = self.options['Ne'] 
+        Isc = self.adjusted_options['Isc']
+        Nc  = self.options['Nc'] 
+        Bf  = self.options['Bf'] 
+        Br  = self.options['Br'] 
+
+        Vbe = Vb - Ve
+        Vbc = Vb - Vc
+        Vsc = Vs - Vc
+
+        gmin = 1e-12
+        
+        gbei = Is / (Nf * Vt * Bf) * exp_lim(Vbe / (Nf * Vt))
+        gben = Ise / (Ne * Vt) * exp_lim(Vbe / (Ne * Vt)) + gmin
+        gpi  = gbei + gben
+
+        gbci = Is / (Nr * Vt * Br) * exp_lim(Vbc / (Nr * Vt))
+        gbcn = Isc / (Nc * Vt) * exp_lim(Vbc / (Nc * Vt)) + gmin
+        gmu  = gbci + gbcn
+
+        If = Is * (exp_lim(Vbe / (Nf * Vt)) - 1.)
+        Ir = Is * (exp_lim(Vbc / (Nr * Vt)) - 1.)
+
+        Q1 = 1. / (1. - (Vbc / Vaf) - (Vbe / Var))
+        Q2 = (If / Ikf) + (Ir / Ikr)
+        Qb = (Q1 / 2.) * (1. + np.sqrt(1. + 4. * Q2))
+
+        gif = gbei * Bf
+        gir = gbci * Br
+
+        dQb_dVbe = Q1 * ((Qb / Var) + (gif / (Ikf * np.sqrt(1. + 4. * Q2))))
+        dQb_dVbc = Q1 * ((Qb / Vaf) + (gir / (Ikr * np.sqrt(1. + 4. * Q2))))
+
+        It = (If - Ir) / Qb
+
+        gmf = (1. / Qb) * (+ gif - It * dQb_dVbe)
+        gmr = (1. / Qb) * (- gir - It * dQb_dVbc)
+
+        return gmu, gpi, gmf, gmr
+
     def __str__(self):
         return 'BJT: {}\nNodes BCE nodes = {}, {}, {}\n'.format(self.name, self.n1, self.n2, self.n3)
 
 # limit the maximum derivative of the exponential function
 def exp_lim(x):
-    return np.exp(x) if x < 70. else np.exp(70.) + np.exp(70.) * (x - 70.)
+    return np.exp(x) if x < 100. else np.exp(100.) + np.exp(100.) * (x - 100.)
