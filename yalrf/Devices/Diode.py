@@ -333,28 +333,22 @@ class Diode():
 
         return g, I
 
-    def get_i(self, x):
+    def get_i(self, Vd, Vdold):
         Is = self.adjusted_options['Is']
         N  = self.options['N']
         Vt = k * self.options['Temp'] / e
 
-        Vd = self.get_voltage(x)
-        Vd = self.Vdold + 10. * N * Vt * np.tanh((Vd - self.Vdold) / (10. * N * Vt))
-        self.Vdold = Vd
-
-        Id = Is * np.expm(Vd / (N * Vt))
+        # Vd = Vdold + 10. * N * Vt * np.tanh((Vd - Vdold) / (10. * N * Vt))
+        Id = Is * (exp_lim(Vd / (N * Vt)) - 1.)
 
         return Id
 
-    def get_g(self, x):
+    def get_g(self, Vd, Vdold):
         Is = self.adjusted_options['Is']
         N  = self.options['N']
         Vt = k * self.options['Temp'] / e
 
-        Vd = self.get_voltage(x)
-        Vd = self.Vdold + 10. * N * Vt * np.tanh((Vd - self.Vdold) / (10. * N * Vt))
-        self.Vdold = Vd
-
+        # Vd = Vdold + 10. * N * Vt * np.tanh((Vd - Vdold) / (10. * N * Vt))
         g = Is / (N * Vt) * np.exp(Vd / (N * Vt))
 
         return g
