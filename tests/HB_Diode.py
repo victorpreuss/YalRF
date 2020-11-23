@@ -23,7 +23,7 @@ hb = HarmonicBalance('HB1', 1e6, 10)
 
 freqs, Vf, Vt = hb.run(y)
 
-n = 0
+n = 1
 plt.figure()
 plt.subplot(211)
 plt.plot(Vt[n,:])

@@ -118,7 +118,7 @@ class HarmonicBalance:
             vf[0] = vdc[i]
             for k in range(1, K+1):
                 vf[k] = vac[k-1,i]
-                vf[k] = 0 # remove effect of AC
+                vf[k] = 0 # remove effect of AC for now
 
             for s in range(S):
                 vt[i,s] = vf[0].real + 2 * (vf[1].real * np.cos(2. * np.pi * 1 * s / S) -
@@ -140,7 +140,7 @@ class HarmonicBalance:
 
         print('V = {}'.format(V))
 
-        for a in range(40): # run 30 iterations of HB
+        for a in range(30): # run 30 iterations of HB
 
             """ Time-domain v(t) """
 
@@ -398,27 +398,27 @@ class HarmonicBalance:
                     Han[I:I+Kk,J:J+Kk] = Hmn
 
             dIdV = (Toe + Han) @ D
-            J = Y + dIdV         # + Omega * dQdV
-            F = Y @ V + Ig - Is  # + j * Omega * Q
+            J = Y + dIdV # + Omega * dQdV
 
             for i in range(N):
                 k = Kk * i
                 J[k+1,k+1] = 1.
 
-            print('Is = {}'.format(Is))
-            print('Y = {}'.format(Y))
-            print('YV = {}'.format(Y @ V))
-            print('Ig = {}'.format(Ig))
-            print('F = {}'.format(F))
+            F = Y @ V + Ig - Is # + j * Omega * Q
+            V = V - linalg.inv(J) @ F
+
+            # print('Is = {}'.format(Is))
+            # print('Y = {}'.format(Y))
+            # print('YV = {}'.format(Y @ V))
+            # print('Ig = {}'.format(Ig))
+            # print('F = {}'.format(F))
             # print('G = {}'.format(G))
             # print('Toe = {}'.format(Toe))
             # print('Han = {}'.format(Han))
             # print('D = {}'.format(D))
             # print('dIdV = {}'.format(dIdV))
-            print('J = {}'.format(J))
+            # print('J = {}'.format(J))
             # print('V = {}'.format(V))
-            V = V - linalg.inv(J) @ F
-            print('V = {}'.format(V))
 
         S = 8 * K   # increase number of time samples
         Vt = np.zeros((N, S))
