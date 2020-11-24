@@ -526,6 +526,16 @@ class Netlist():
         self.devices.append(cccs)
         return cccs
 
+    def add_gyrator(self, name, n1, n2, n3, n4, G):
+        n1 = self.add_node(n1)
+        n2 = self.add_node(n2)
+        n3 = self.add_node(n3)
+        n4 = self.add_node(n4)
+
+        gyr = Gyrator(name, n1, n2, n3, n4, G)
+        self.devices.append(gyr)
+        return gyr
+
     def add_diode(self, name, n1, n2):
         """
         Add a diode to the netlist.
