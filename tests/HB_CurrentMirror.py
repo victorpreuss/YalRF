@@ -13,10 +13,12 @@ i2 = y.add_idc('I2', 'n1', 'gnd', dc=20e-3)
 r1 = y.add_resistor('R1', 'n1', 'gnd', 200)
 r2 = y.add_resistor('R2', 'n1', 'nc', 200)
 
-q1 = y.add_bjt('Q1', 'nb', 'nc', 'gnd')
-
 i3 = y.add_idc('I3', 'nb', 'gnd', dc=10e-3)
+q1 = y.add_bjt('Q1', 'nb', 'nc', 'gnd')
 q2 = y.add_bjt('Q2', 'nb', 'nb', 'gnd')
+
+# i3 = y.add_idc('I3', 'nx', 'gnd', dc=0.77)
+# g1 = y.add_gyrator('G1', 'nx', 'nb', 'gnd', 'gnd', 1)
 
 q1.options['Is'] = 1e-15
 q1.options['Bf'] = 100

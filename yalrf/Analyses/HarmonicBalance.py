@@ -79,7 +79,7 @@ class HarmonicBalance:
 
             # add currently supported devices stamps
             for dev in lin_devs:
-                if isinstance(dev, (Resistor, Capacitor, Inductor)):
+                if isinstance(dev, (Resistor, Capacitor, Inductor, Gyrator)):
                     dev.add_ac_stamps(Yk, None, None, None, freqs[k])
 
             # remove ground node
@@ -160,7 +160,7 @@ class HarmonicBalance:
                         vt[i,s] = vt[i,s] + 2 * (vf[k].real * np.cos(2. * np.pi * k * s / S) -
                                                  vf[k].imag * np.sin(2. * np.pi * k * s / S))
 
-                
+         
                 # plt.plot(vt[i,:])
                 # plt.show()
 
@@ -300,9 +300,9 @@ class HarmonicBalance:
             gt = gt[1:,1:,:]
             it = it[1:,:]
 
-            print('vt = {}'.format(vt))
-            print('gt = {}'.format(gt))
-            print('it = {}'.format(it))
+            # print('vt = {}'.format(vt))
+            # print('gt = {}'.format(gt))
+            # print('it = {}'.format(it))
 
             # compute the spectrum of each port conductance
             G = np.zeros((N, N, K+1), dtype=complex)

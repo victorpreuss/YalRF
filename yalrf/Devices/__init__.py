@@ -9,8 +9,8 @@ from .VoltageControlledVoltageSource import VoltageControlledVoltageSource
 from .VoltageControlledCurrentSource import VoltageControlledCurrentSource
 from .CurrentControlledVoltageSource import CurrentControlledVoltageSource
 from .CurrentControlledCurrentSource import CurrentControlledCurrentSource
-
 from .TransientVoltageSource import TransientVoltageSource
+from .Gyrator import Gyrator
 
 from .Opamp import Opamp
 from .Diode import Diode
