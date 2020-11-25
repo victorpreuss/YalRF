@@ -203,6 +203,34 @@ class BJT():
     def add_tran_stamps(self, A, z, x, iidx, xt, t, tstep):
         self.add_dc_stamps(A, z, x, iidx)
 
+    def add_hb_stamps(self, v, i, g, k):
+        B = self.n1 
+        C = self.n2 
+        E = self.n3 
+
+        # calculate currents at the BJT
+        Vb = v[B-1,k] if B > 0 else 0
+        Vc = v[C-1,k] if C > 0 else 0
+        Ve = v[E-1,k] if E > 0 else 0
+        Vs = 0
+
+        Ib, Ic, Ie = self.get_i(Vb, Vc, Ve, Vs)
+        gmu, gpi, gmf, gmr = self.get_g(Vb, Vc, Ve, Vs)
+
+        g[B,B,k] = g[B,B,k] + gmu + gpi
+        g[B,C,k] = g[B,C,k] - gmu
+        g[B,E,k] = g[B,E,k] - gpi
+        g[C,B,k] = g[C,B,k] - gmu + gmf + gmr
+        g[C,C,k] = g[C,C,k] + gmu - gmr
+        g[C,E,k] = g[C,E,k] - gmf
+        g[E,B,k] = g[E,B,k] - gpi - gmf - gmr
+        g[E,C,k] = g[E,C,k] + gmr
+        g[E,E,k] = g[E,E,k] + gpi + gmf
+
+        i[B,k] = i[B,k] + Ib
+        i[C,k] = i[C,k] + Ic
+        i[E,k] = i[E,k] - Ie
+
     def save_oppoint(self):
         Ib = self.oppoint['Ib']
         Ic = self.oppoint['Ic']
@@ -420,6 +448,9 @@ class BJT():
 
         return Vbe, Vbc
 
+    # TODO: get_i() and get_g() are temporary implementations to test
+    #       the harmonic balance algorithm. Eventually the complete
+    #       BJT model should be used.
     def get_i(self, Vb, Vc, Ve, Vs):
         Vt  = k * self.options['Temp'] / e
         Is  = self.adjusted_options['Is'] 
@@ -522,3 +553,44 @@ class BJT():
 # limit the maximum derivative of the exponential function
 def exp_lim(x):
     return np.exp(x) if x < 100. else np.exp(100.) + np.exp(100.) * (x - 100.)
+
+"""
+
+    # LEGACY CODE TO USE SECANT METHOD FOR dIdV
+
+    # USING SECANT METHOD 
+    Ibn, Icn, Ien = dev.get_i(Vb * 1.01, Vc, Ve, Vs)
+
+    gbb = (Ibn - Ib) / (0.01 * Vb)
+    gcb = (Icn - Ic) / (0.01 * Vb)
+    geb = (Ien - Ie) / (0.01 * Vb)
+
+    gt[B,B,s] = gt[B,B,s] + gbb
+    gt[C,B,s] = gt[C,B,s] + gcb
+    gt[E,B,s] = gt[E,B,s] + geb
+
+    Ibn, Icn, Ien = dev.get_i(Vb, Vc * 1.01, Ve, Vs)
+
+    gcc = (Icn - Ic) / (0.01 * Vc)
+    gbc = (Ibn - Ib) / (0.01 * Vc)
+    gec = (Ien - Ie) / (0.01 * Vc)
+
+    gt[C,C,s] = gt[C,C,s] + gcc
+    gt[B,C,s] = gt[B,C,s] + gbc
+    gt[E,C,s] = gt[E,C,s] + gec
+
+    Ibn, Icn, Ien = dev.get_i(Vb, Vc, Ve * 1.01, Vs)
+
+    gee = (Ien - Ie) / (0.01 * Ve)
+    gbe = (Ibn - Ib) / (0.01 * Ve)
+    gce = (Icn - Ic) / (0.01 * Ve)
+
+    gt[E,E,s] = gt[E,E,s] + gee
+    gt[B,E,s] = gt[B,E,s] + gbe
+    gt[C,E,s] = gt[C,E,s] + gce
+
+    it[B,s] = it[B,s] + Ib
+    it[C,s] = it[C,s] + Ic
+    it[E,s] = it[E,s] - Ie
+
+"""

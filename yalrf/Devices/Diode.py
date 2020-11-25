@@ -166,6 +166,27 @@ class Diode():
         z[self.n1] = z[self.n1] - self.It
         z[self.n2] = z[self.n2] + self.It
 
+    def add_hb_stamps(self, v, i, g, k):
+        n1 = self.n1
+        n2 = self.n2
+
+        # calculate current over the diode
+        v1 = v[n1-1,k] if n1 > 0 else 0
+        v2 = v[n2-1,k] if n2 > 0 else 0
+        Vd = v1 - v2
+
+        # TODO: verify the need for voltage limiting
+        Id = self.get_i(Vd, 0)
+        gd = self.get_g(Vd, 0)
+
+        g[n1,n1,k] = g[n1,n1,k] + gd
+        g[n2,n2,k] = g[n2,n2,k] + gd
+        g[n1,n2,k] = g[n1,n2,k] - gd
+        g[n2,n1,k] = g[n2,n1,k] - gd
+
+        i[n1,k] = i[n1,k] + Id
+        i[n2,k] = i[n2,k] - Id
+
     def save_oppoint(self):
         # store operating point information needed for transient simulation
         Qop = self.oppoint['Qd']
@@ -309,30 +330,9 @@ class Diode():
 
         return Vd
 
-    # Legacy: a simple exponential diode, used for initial experiments :-)
-    def get_gd_and_Id_shockley(self, A, z, x, iidx):
-        Is = self.adjusted_options['Is']
-        N  = self.options['N']
-        Vt = k * self.options['Temp'] / e
-
-        V1 = x[self.n1-1] if self.n1 else 0.
-        V2 = x[self.n2-1] if self.n2 else 0.
-
-        Vd = V1 - V2
-
-        # limiting algorithm to avoid overflow
-        Vcrit = N * Vt * np.log(N * Vt / (np.sqrt(2.) * Is))
-        if (Vd > Vcrit and Vd > 0.):
-            Vd = self.Vdold + N * Vt * np.log(1. + (Vd - self.Vdold) / (N * Vt))
-        self.Vdold = Vd
-
-        Id = Is * (np.exp(Vd / (N * Vt)) - 1.)
-
-        g = Is / (N * Vt) * np.exp(Vd / (N * Vt))
-        I = Id - g * Vd
-
-        return g, I
-
+    # TODO: get_i() and get_g() are temporary implementations
+    #       to test the harmonic balance algorithm. Eventually
+    #       the complete diode model should be used.
     def get_i(self, Vd, Vdold):
         Is = self.adjusted_options['Is']
         N  = self.options['N']
@@ -359,3 +359,13 @@ class Diode():
 # limit the maximum derivative of the exponential function
 def exp_lim(x):
     return np.exp(x) if x < 700. else np.exp(700.) + np.exp(700.) * (x - 700.)
+
+"""
+
+    # LEGACY CODE TO USE SECANT METHOD FOR dIdV
+
+    # USING SECANT METHOD
+    Id2 = dev.get_i(Vd * 1.01, Vdold)
+    gd = (Id2 - Id) / (0.01 * Vd)
+
+"""

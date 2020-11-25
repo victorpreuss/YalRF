@@ -5,9 +5,9 @@ import setup
 from yalrf import YalRF, Netlist
 from yalrf.Analyses import HarmonicBalance
 
-y = YalRF('Differential Amplifier')
+y = Netlist('Differential Amplifier')
 
-vin = 10e-3
+vin = 11e-3
 
 # VCC
 i1 = y.add_idc('I1', 'nx', 'gnd', dc=5)

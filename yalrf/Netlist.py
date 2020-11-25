@@ -850,4 +850,14 @@ class Netlist():
             logger.warning('Unknown node name: {}!'.format(name))
             return None
 
+    def copy(self):
+
+        netlist = Netlist(self.name)
+
+        netlist.devices = self.devices
+        netlist.node_name_to_idx = self.node_name_to_idx
+        netlist.node_idx_to_name = self.node_idx_to_name
+
+        return netlist
+
 
