@@ -140,7 +140,12 @@ class HarmonicBalance:
 
         print('V = {}'.format(V))
 
-        for a in range(30): # run 30 iterations of HB
+        abstol = 1e-6
+        reltol = 1e-3
+        maxiter = 100
+
+        itercnt = 0
+        while True:
 
             """ Time-domain v(t) """
 
@@ -317,16 +322,16 @@ class HarmonicBalance:
             """ Nonlinear current (Ig) """
 
             # TODO: generalize this section for 3-port devices
-            Ig = np.zeros((W, 1))
+            Inl = np.zeros((W, 1))
             for i in range(N):
                 for k in range(K+1):
-                    Igk = complex()
+                    Inlk = complex()
                     for s in range(S):
-                        Igk = Igk + it[i,s] * (np.cos(2. * np.pi * k * s / S) -
+                        Inlk = Inlk + it[i,s] * (np.cos(2. * np.pi * k * s / S) -
                                                1j * np.sin(2. * np.pi * k * s / S))
-                    Igk = Igk / S
-                    Ig[Kk*i+2*k] = Igk.real
-                    Ig[Kk*i+2*k+1] = Igk.imag
+                    Inlk = Inlk / S
+                    Inl[Kk*i+2*k] = Inlk.real
+                    Inl[Kk*i+2*k+1] = Inlk.imag
 
             """ Creating the dIdV matrix from G(jw) """
 
@@ -398,13 +403,30 @@ class HarmonicBalance:
                     Han[I:I+Kk,J:J+Kk] = Hmn
 
             dIdV = (Toe + Han) @ D
-            J = Y + dIdV # + Omega * dQdV
+            J = Y + dIdV                    # + Omega * dQdV
 
             for i in range(N):
                 k = Kk * i
                 J[k+1,k+1] = 1.
 
-            F = Y @ V + Ig - Is # + j * Omega * Q
+            Il = Y @ V - Is
+
+            converged = True
+            
+            F = Il + Inl                    # + j * Omega * Q
+            for i in range(W):
+                if abs(F[i]) > abstol:
+                    converged = False
+
+            Frel = 2 * abs(F / (Il - Inl + 1e-12))
+            for i in range(W):
+                if Frel[i] > reltol:
+                    converged = False
+
+            itercnt += 1
+            if converged or itercnt >= maxiter:
+                break
+
             V = V - linalg.inv(J) @ F
 
             # print('Is = {}'.format(Is))
