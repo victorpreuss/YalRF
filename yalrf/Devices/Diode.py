@@ -357,6 +357,7 @@ class Diode():
         return 'Diode: {}\nNodes = {} -> {}\n'.format(self.name, self.n1, self.n2)
 
 # limit the maximum derivative of the exponential function
+# TODO: improve this to a quadratic approximation
 def exp_lim(x):
     return np.exp(x) if x < 700. else np.exp(700.) + np.exp(700.) * (x - 700.)
 

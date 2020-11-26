@@ -38,24 +38,17 @@ class HarmonicBalance:
 
         """ Get basic sizes """
 
-        K = self.numharmonics           # frequency of the 1st harmonic
-        N = netlist.get_num_nodes() - 1 # total number of nodes in the netlist without 'gnd'
+        self.K = self.numharmonics           # frequency of the 1st harmonic
+        self.N = netlist.get_num_nodes() - 1 # total number of nodes in the netlist without 'gnd'
 
-        Kk = 2 * (K + 1)                # size of block matrices in the system
-        W = Kk * N                      # total size of the matrix system 2 * (K+1) * N
+        self.Kk = 2 * (self.K + 1)           # size of block matrices in the system
+        self.W = self.Kk * self.N            # total size of the matrix system 2 * (K+1) * N
         
-        T = 1. / self.freq              # period of the 1st harmonic
-        S = 2 * K + 1                   # time array length for DFT/IDFT
+        self.T = 1. / self.freq              # period of the 1st harmonic
+        self.S = 2 * self.K + 1              # time array length for DFT/IDFT
 
         # array with the Kth harmonic frequencies
-        freqs = self.freq * np.linspace(0, K, K+1)
-
-        self.W = W
-        self.Kk = Kk
-        self.N = N
-        self.K = K
-        self.S = S
-        self.freqs = freqs
+        self.freqs = self.freq * np.linspace(0, self.K, self.K+1)
 
         """ Independent current sources (Is) """
 
@@ -63,44 +56,48 @@ class HarmonicBalance:
 
         print('Is = {}'.format(Is))
 
-        """ Transadmittance matrix (Y) """
+        """ Transadmittance matrix Y(jw) """
 
         Y = self.calc_Y()
 
         print('Y = {}'.format(Y))
         
-        """ Initial voltage estimation for each node (V, vt) """
+        """ Initial voltage estimation for each node V(jw) and v(t) """
 
         V, vt = self.calc_V0()
 
         print('V = {}'.format(V))
 
-        """ Get simulation options """
-
-        abstol = self.options['abstol']
-        reltol = self.options['reltol']
-        maxiter = self.options['maxiter']
-
         """ Start Harmonic Balance Solver """
 
-        gt = np.zeros((N+1, N+1, S))
-        G = np.zeros((self.N, self.N, self.K+1), dtype=complex)
+        gt = np.zeros((self.N+1, self.N+1, self.S))             # time-varying nonlinear conductances
+        G = np.zeros((self.N, self.N, self.K+1), dtype=complex) # frequency-domain nonlinear conductances
 
-        it = np.zeros((N+1, S))
-        Inl = np.zeros((W, 1))
+        it = np.zeros((self.N+1, self.S)) # time-domain nonlinear current
+        Inl = np.zeros((self.W, 1))       # frequency-domain nonlinear current
 
+        # matrices that form dI/dV
+        Toe = np.zeros((self.W, self.W))
+        Han = np.zeros((self.W, self.W))
+        D = np.eye(self.W)
+
+        # DC elements are 1/2 (from DFT derivation)
+        for i in range(self.N):
+            k = self.Kk * i
+            D[k,k] = 0.5
+            D[k+1,k+1] = 0.5
+
+        converged = False
+        maxiter = self.options['maxiter']
         itercnt = 0
         while True:
 
             """ Time-domain v(t) """
 
-            vtold = vt.copy()
-
+            # vtold = vt.copy()
             self.ifft_V(V, vt)
 
-            # print(vt)
-            # plt.plot(vt[0,:])
-            # plt.show()
+            # print('vt = {}'.format(vt))
 
             """ Time-domain g(t) and i(t) waveforms """
 
@@ -111,7 +108,6 @@ class HarmonicBalance:
                 for dev in self.nonlin_devs:
                     dev.add_hb_stamps(vt, it, gt, s)
 
-            # print('vt = {}'.format(vt))
             # print('gt = {}'.format(gt))
             # print('it = {}'.format(it))
             
@@ -119,136 +115,90 @@ class HarmonicBalance:
 
             self.fft_G(gt[1:,1:,:], G)
 
+            # print('G = {}'.format(G))
+
+            """ Creating the dIdV matrix from G(jw) """
+
+            dIdV = self.calc_dIdV(G, Toe, Han, D)
+
+            # print('dIdV = {}'.format(dIdV))
+
+            """ Calculating the Jacobian Matrix J(jw) """
+
+            J = Y + dIdV # + Omega * dQdV
+
+            # need to add a dummy value to the complex part of the DC voltages
+            for i in range(self.N):
+                k = self.Kk * i
+                J[k+1,k+1] = 1.
+
+            # print('J = {}'.format(J))
+
+            """ Linear current Il(jw) """
+
+            Il = Y @ V - Is
+
             """ Nonlinear current Inl(jw) """
 
             self.fft_Inl(it[1:,:], Inl)
 
-            """ Creating the dIdV matrix from G(jw) """
+            """ Calculate error function F(jw) """
 
-            # creating matrices that form dI/dV
-            Toe = np.zeros((W, W))
-            Han = np.zeros((W, W))
-            D = np.eye(W)
+            F = Il + Inl # + j * Omega * Q
 
-            # DC elements are 1/2 (from DFT derivation)
-            for i in range(N):
-                k = Kk * i
-                D[k,k] = 0.5
-                D[k+1,k+1] = 0.5
+            # print('F = {}'.format(F))
 
-            # creating the Toeplitz matrix
-            for i in range(N):
-                for j in range(N):
-                    Tmn = np.zeros((Kk, Kk))
-                    for k in range(K+1):
-                        for l in range(k, K+1):
-                            
-                            z = abs(k-l)
-                            t = np.zeros((2,2))
+            """ Check algorithm termination conditions """
 
-                            t[0,0] = +G[i,j,z].real
-                            t[0,1] = +G[i,j,z].imag
-                            t[1,0] = -G[i,j,z].imag
-                            t[1,1] = +G[i,j,z].real
-
-                            Tmn[2*k:2*k+2,2*l:2*l+2] = t
-
-                            t[0,1] = -t[0,1]
-                            t[1,0] = -t[1,0]
-
-                            Tmn[2*l:2*l+2,2*k:2*k+2] = t
-
-                    # insert Tmn (Kk x Kk) submatrix into the proper position
-                    I = Kk * i
-                    J = Kk * j
-                    Toe[I:I+Kk,J:J+Kk] = Tmn
-
-            # creating the Hankel matrix
-            for i in range(N):
-                for j in range(N):
-                    Hmn = np.zeros((Kk, Kk))
-                    for k in range(K+1):
-                        for l in range(K+1):
-                            
-                            z = k + l
-                            h = np.zeros((2,2))
-
-                            if z < K+1:
-                                h[0,0] = +G[i,j,z].real
-                                h[0,1] = +G[i,j,z].imag
-                                h[1,0] = +G[i,j,z].imag
-                                h[1,1] = -G[i,j,z].real
-                            else:
-                                z = 2 * K + 1 - z
-                                h[0,0] = +G[i,j,z].real
-                                h[0,1] = -G[i,j,z].imag
-                                h[1,0] = -G[i,j,z].imag
-                                h[1,1] = -G[i,j,z].real
-
-                            Hmn[2*k:2*k+2,2*l:2*l+2] = h
-
-                    # insert Hmn (Kk x Kk) submatrix into the proper position
-                    I = Kk * i
-                    J = Kk * j
-                    Han[I:I+Kk,J:J+Kk] = Hmn
-
-            dIdV = (Toe + Han) @ D
-            J = Y + dIdV                    # + Omega * dQdV
-
-            for i in range(N):
-                k = Kk * i
-                J[k+1,k+1] = 1.
-
-            Il = Y @ V - Is
-
-            converged = True
-            
-            F = Il + Inl                    # + j * Omega * Q
-            for i in range(W):
-                if abs(F[i]) > abstol:
-                    converged = False
-
-            Frel = 2 * abs(F / (Il - Inl + 1e-12))
-            for i in range(W):
-                if Frel[i] > reltol:
-                    converged = False
-
+            converged = self.hb_converged(Il, Inl)
             itercnt += 1
             if converged or itercnt >= maxiter:
                 break
 
+            """ Calculate next voltage guess using NR """
+
             V = V - linalg.inv(J) @ F
 
-            # print('Is = {}'.format(Is))
-            # print('Y = {}'.format(Y))
-            # print('YV = {}'.format(Y @ V))
-            # print('Ig = {}'.format(Ig))
-            # print('F = {}'.format(F))
-            # print('G = {}'.format(G))
-            # print('Toe = {}'.format(Toe))
-            # print('Han = {}'.format(Han))
-            # print('D = {}'.format(D))
-            # print('dIdV = {}'.format(dIdV))
-            # print('J = {}'.format(J))
+            # ensure there is no complex part on the DC voltages
+            for i in range(self.N):
+                V[self.Kk*i+1] = 0.
+
             # print('V = {}'.format(V))
 
-        S = 8 * K   # increase number of time samples
-        Vt = np.zeros((N, S))
-        Vf = np.zeros((N, K+1), dtype=complex)
-        for i in range(N):
+        S = 8 * self.K   # increase number of time samples
+        Vt = np.zeros((self.N, S))
+        Vf = np.zeros((self.N, self.K+1), dtype=complex)
+        for i in range(self.N):
 
             # assemble complex array of spectra for node 'i'
-            for k in range(K+1):
-                Vf[i,k] = V[Kk*i+2*k+0] + 1j * V[Kk*i+2*k+1]
+            for k in range(self.K+1):
+                Vf[i,k] = V[self.Kk*i+2*k+0] + 1j * V[self.Kk*i+2*k+1]
 
             # compute inverse fourier transform of voltage waveform
             for s in range(S):
                 Vt[i,s] = Vf[i,0].real
-                for k in range(1, K+1):
+                for k in range(1, self.K+1):
                     Vt[i,s] = Vt[i,s] + 2 * (Vf[i,k].real * np.cos(2. * np.pi * k * s / S) -
                                              Vf[i,k].imag * np.sin(2. * np.pi * k * s / S))
 
-        return freqs, Vf, Vt
+        return self.freqs, Vf, Vt
+
+    def hb_converged(self, Il, Inl):
+        abstol = self.options['abstol']
+        reltol = self.options['reltol']
+        converged = True
+
+        F = Il + Inl
+        for i in range(self.W):
+            if abs(F[i]) > abstol:
+                converged = False
+
+        Frel = 2 * abs(F / (Il - Inl + 1e-12))
+        for i in range(self.W):
+            if Frel[i] > reltol:
+                converged = False
+        
+        return converged
 
     def calc_Is(self):
         Kk = self.Kk
@@ -262,19 +212,18 @@ class HarmonicBalance:
                     Is[Kk*n1+0] += dev.dc
                     Is[Kk*n1+1] += 0.
                     Is[Kk*n1+2] += iac.real / 2.
-                    Is[Kk*n1+3] += iac.imag / 2.
+                    Is[Kk*n1+3] -= iac.imag / 2.
 
                 n2 = dev.n2 - 1
                 if n2 >= 0:
                     Is[Kk*n2+0] -= dev.dc
                     Is[Kk*n2+1] -= 0.
                     Is[Kk*n2+2] -= iac.real / 2.
-                    Is[Kk*n2+3] -= iac.imag / 2.
+                    Is[Kk*n2+3] += iac.imag / 2.
 
         return Is
 
     def calc_Y(self):
-
         Y = np.zeros((self.W, self.W))
         for k in range(self.K+1):
 
@@ -308,7 +257,6 @@ class HarmonicBalance:
         return Y
 
     def calc_V0(self):
-
         # create node voltages using AC simulation results
         ac = AC('HB.AC', start=self.freqs[1], stop=self.freqs[self.K], numpts=self.K)
         ac.run(self.netlist)
@@ -361,6 +309,9 @@ class HarmonicBalance:
                     vt[i,s] = vt[i,s] + 2 * (vf[k].real * np.cos(2. * np.pi * k * s / self.S) -
                                              vf[k].imag * np.sin(2. * np.pi * k * s / self.S))
 
+        # plt.plot(vt[0,:])
+        # plt.show()
+
     def fft_G(self, gt, G):
         G[:,:,:] = 0
         for i in range(self.N):
@@ -383,7 +334,62 @@ class HarmonicBalance:
                 Inl[self.Kk*i+2*k] = Inlk.real
                 Inl[self.Kk*i+2*k+1] = Inlk.imag
 
+    def calc_dIdV(self, G, Toe, Han, D):
+        N = self.N
+        K = self.K
+        Kk = self.Kk
 
+        # populating Toeplitz and Hankel matrices
+        Toe[:,:] = 0
+        Han[:,:] = 0
+        for i in range(N):
+            for j in range(N):
+                Tmn = np.zeros((Kk, Kk))
+                Hmn = np.zeros((Kk, Kk))
+                for k in range(K+1):
+                    for l in range(k, K+1):
+                        
+                        # Toeplitz submatrix
+                        z = abs(k-l)
+                        t = np.zeros((2,2))
 
+                        t[0,0] = +G[i,j,z].real
+                        t[0,1] = +G[i,j,z].imag
+                        t[1,0] = -G[i,j,z].imag
+                        t[1,1] = +G[i,j,z].real
 
+                        Tmn[2*k:2*k+2,2*l:2*l+2] = t
+
+                        t[0,1] = -t[0,1]
+                        t[1,0] = -t[1,0]
+
+                        Tmn[2*l:2*l+2,2*k:2*k+2] = t
+
+                    for l in range(K+1):
+
+                        # Hankel submatrix
+                        z = k + l
+                        h = np.zeros((2,2))
+
+                        if z < K+1:
+                            h[0,0] = +G[i,j,z].real
+                            h[0,1] = +G[i,j,z].imag
+                            h[1,0] = +G[i,j,z].imag
+                            h[1,1] = -G[i,j,z].real
+                        else:
+                            z = 2 * K + 1 - z
+                            h[0,0] = +G[i,j,z].real
+                            h[0,1] = -G[i,j,z].imag
+                            h[1,0] = -G[i,j,z].imag
+                            h[1,1] = -G[i,j,z].real
+
+                        Hmn[2*k:2*k+2,2*l:2*l+2] = h
+
+                # insert Tmn and Hmn submatrices into the proper position
+                I = Kk * i
+                J = Kk * j
+                Toe[I:I+Kk,J:J+Kk] = Tmn
+                Han[I:I+Kk,J:J+Kk] = Hmn
+
+        return (Toe + Han) @ D
 
