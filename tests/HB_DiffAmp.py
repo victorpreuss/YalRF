@@ -9,9 +9,10 @@ y = Netlist('Differential Amplifier')
 
 # circuit parameters
 ibias = 50e-3
-vbias = 2.5
+vbias = 2.0
 vcc = 5
-vin = 11e-3
+vin = 60e-3
+rload = 50
 
 # VCC
 i1 = y.add_idc('I1', 'nx', 'gnd', dc=vcc)
@@ -28,8 +29,8 @@ i5 = y.add_idc('I5', 'nz', 'gnd', dc=vbias)
 g3 = y.add_gyrator('G3', 'nz', 'nb2', 'gnd', 'gnd', 1)
 
 # collector loads
-r1 = y.add_resistor('R1', 'nvcc', 'nc1', 100)
-r2 = y.add_resistor('R2', 'nvcc', 'nc2', 100)
+r1 = y.add_resistor('R1', 'nvcc', 'nc1', rload)
+r2 = y.add_resistor('R2', 'nvcc', 'nc2', rload)
 
 # differential pair
 q1 = y.add_bjt('Q1', 'nb1', 'nc1', 'ne')
@@ -48,7 +49,7 @@ q2.options = q1.options
 q3.options = q1.options
 q4.options = q1.options
 
-hb = HarmonicBalance('HB1', 10e6, 5)
+hb = HarmonicBalance('HB1', 10e6, 10)
 
 freqs, Vf, Vt = hb.run(y)
 

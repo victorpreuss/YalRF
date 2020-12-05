@@ -68,8 +68,77 @@ class HarmonicBalance:
 
         print('V = {}'.format(V))
 
-        """ Start Harmonic Balance Solver """
+        """ Run Harmonic Balance Solver """
 
+        # V, converged = self.hb_loop(Is, Y, V, vt)
+        # print(converged)
+        converged = False
+
+        # if first attempt fails, try continuation method
+        if converged == False:
+            V, vt = self.calc_V0()
+            Vprev = V.copy()
+
+            maxiter = 50
+            alpha = 0.1
+            converged = False
+            itercnt = 0
+            while (not converged) and (itercnt < maxiter):
+
+                Iscpy = Is.copy()
+                for i in range(self.N):
+                    for k in range(1, self.K+1):
+                        Iscpy[self.Kk*i+2*k+0] *= alpha
+                        Iscpy[self.Kk*i+2*k+1] *= alpha
+
+                V, issolved = self.hb_loop(Iscpy, Y, V, vt)
+
+                print('alpha = {}'.format(alpha))
+                print('issolved = {}'.format(issolved))
+                
+                if issolved:
+                    
+                    if alpha >= 1.0:
+                        converged = True
+                        break
+
+                    Vprev = V.copy()
+                    alpha = 1.75 * alpha
+                    if alpha >= 1.0:
+                        alpha = 1.0
+
+                else:
+                    V = Vprev
+                    self.ifft_V(V, vt)
+                    alpha = alpha / 1.5
+                    if alpha <= 0.001:
+                        converged = False
+                        break
+
+                itercnt += 1
+
+            print('converged = {}'.format(converged))
+            print('iterations = {}'.format(itercnt))
+
+        S = 8 * self.K   # increase number of time samples
+        Vt = np.zeros((self.N, S))
+        Vf = np.zeros((self.N, self.K+1), dtype=complex)
+        for i in range(self.N):
+
+            # assemble complex array of spectra for node 'i'
+            for k in range(self.K+1):
+                Vf[i,k] = V[self.Kk*i+2*k+0] + 1j * V[self.Kk*i+2*k+1]
+
+            # compute inverse fourier transform of voltage waveform
+            for s in range(S):
+                Vt[i,s] = Vf[i,0].real
+                for k in range(1, self.K+1):
+                    Vt[i,s] = Vt[i,s] + 2 * (Vf[i,k].real * np.cos(2. * np.pi * k * s / S) -
+                                             Vf[i,k].imag * np.sin(2. * np.pi * k * s / S))
+
+        return self.freqs, Vf, Vt
+
+    def hb_loop(self, Is, Y, V, vt):
         gt = np.zeros((self.N+1, self.N+1, self.S))             # time-varying nonlinear conductances
         G = np.zeros((self.N, self.N, self.K+1), dtype=complex) # frequency-domain nonlinear conductances
 
@@ -153,7 +222,7 @@ class HarmonicBalance:
             converged = self.hb_converged(Il, Inl)
             itercnt += 1
             if converged or itercnt >= maxiter:
-                break
+                return V, converged
 
             """ Calculate next voltage guess using NR """
 
@@ -164,24 +233,6 @@ class HarmonicBalance:
                 V[self.Kk*i+1] = 0.
 
             # print('V = {}'.format(V))
-
-        S = 8 * self.K   # increase number of time samples
-        Vt = np.zeros((self.N, S))
-        Vf = np.zeros((self.N, self.K+1), dtype=complex)
-        for i in range(self.N):
-
-            # assemble complex array of spectra for node 'i'
-            for k in range(self.K+1):
-                Vf[i,k] = V[self.Kk*i+2*k+0] + 1j * V[self.Kk*i+2*k+1]
-
-            # compute inverse fourier transform of voltage waveform
-            for s in range(S):
-                Vt[i,s] = Vf[i,0].real
-                for k in range(1, self.K+1):
-                    Vt[i,s] = Vt[i,s] + 2 * (Vf[i,k].real * np.cos(2. * np.pi * k * s / S) -
-                                             Vf[i,k].imag * np.sin(2. * np.pi * k * s / S))
-
-        return self.freqs, Vf, Vt
 
     def hb_converged(self, Il, Inl):
         abstol = self.options['abstol']
