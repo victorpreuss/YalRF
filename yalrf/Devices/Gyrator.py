@@ -34,5 +34,5 @@ class Gyrator():
         self.add_dc_stamps(A, z, x, iidx)
 
     def __str__(self):
-        return 'VCCS: {}\nNodes = {} -> {} and {}->{}\nG = {}\ndelay={}\n'.format(self.name, self.n1, self.n2, self.n3, self.n4, self.G, self.tau)
+        return 'Gyrator: {}\nNodes = {} -> {} and {}->{}\nG = {}\ndelay={}\n'.format(self.name, self.n1, self.n2, self.n3, self.n4, self.G)
 

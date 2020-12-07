@@ -2,6 +2,9 @@ from .Resistor import Resistor
 from .Capacitor import Capacitor
 from .Inductor import Inductor
 
+from .IdealHarmonicFilter import IdealHarmonicFilter
+from .Gyrator import Gyrator
+
 from .VoltageSource import VoltageSource
 from .CurrentSource import CurrentSource
 
@@ -10,7 +13,6 @@ from .VoltageControlledCurrentSource import VoltageControlledCurrentSource
 from .CurrentControlledVoltageSource import CurrentControlledVoltageSource
 from .CurrentControlledCurrentSource import CurrentControlledCurrentSource
 from .TransientVoltageSource import TransientVoltageSource
-from .Gyrator import Gyrator
 
 from .Opamp import Opamp
 from .Diode import Diode

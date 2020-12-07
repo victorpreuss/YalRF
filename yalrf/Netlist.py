@@ -536,6 +536,30 @@ class Netlist():
         self.devices.append(gyr)
         return gyr
 
+    def add_idealharmonicfilter(self, name, n1, n2, freq):
+        n1 = self.add_node(n1)
+        n2 = self.add_node(n2)
+
+        ihf = IdealHarmonicFilter(name, n1, n2, freq)
+        self.devices.append(ihf)
+        return ihf
+
+    def add_dcblock(self, name, n1, n2):
+        n1 = self.add_node(n1)
+        n2 = self.add_node(n2)
+
+        dcblk = DCBlock(name, n1, n2)
+        self.devices.append(dcblk)
+        return dcblk
+
+    def add_dcfeed(self, name, n1, n2):
+        n1 = self.add_node(n1)
+        n2 = self.add_node(n2)
+
+        dcfeedf = DCFeed(name, n1, n2)
+        self.devices.append(dcfeed)
+        return dcfeed
+
     def add_diode(self, name, n1, n2):
         """
         Add a diode to the netlist.
