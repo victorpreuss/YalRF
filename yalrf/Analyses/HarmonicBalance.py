@@ -79,25 +79,26 @@ class HarmonicBalance:
 
         Is = self.calc_Is()
 
-        print('Is = {}'.format(Is))
+        # print('Is = {}'.format(Is))
 
         """ Transadmittance matrix Y(jw) """
 
         Y = self.calc_Y()
 
-        print('Y = {}'.format(Y))
+        # print('Y = {}'.format(Y))
         
         """ Initial voltage estimation for each node V(jw) and v(t) """
 
         V, vt = self.calc_V0()
 
-        print('V = {}'.format(V))
-        print('Vt = {}'.format(vt))
+        # print('V = {}'.format(V))
+        # print('Vt = {}'.format(vt))
 
         """ Run Harmonic Balance Solver """
 
-        V, converged = self.hb_loop(Is, Y, V, vt)
-        print(converged)
+        # V, converged = self.hb_loop(Is, Y, V, vt)
+        # print(converged)
+        converged = False
 
         # if first attempt fails, try continuation method
         if converged == False:
@@ -128,14 +129,14 @@ class HarmonicBalance:
                         break
 
                     Vprev = V.copy()
-                    alpha = 1.5 * alpha
+                    alpha = 1.25 * alpha
                     if alpha >= 1.0:
                         alpha = 1.0
 
                 else:
                     V = Vprev
                     self.ifft_V(V, vt)
-                    alpha = alpha / 1.2
+                    alpha = alpha / 1.1
                     if alpha <= 0.001:
                         converged = False
                         break
@@ -144,6 +145,9 @@ class HarmonicBalance:
 
             print('converged = {}'.format(converged))
             print('iterations = {}'.format(itercnt))
+
+        if not converged:
+            return converged, None, None, None, None
 
         S = 32 * self.K # increase number of time samples
         Vt = np.zeros((self.N, S))
@@ -166,7 +170,7 @@ class HarmonicBalance:
         self.Vt = Vt
         self.Vf = Vf
 
-        return self.freqs, self.Vf, self.Vt
+        return converged, self.freqs, self.Vf, self.time, self.Vt
 
     def hb_loop(self, Is, Y, V, vt):
         gt = np.zeros((self.N+1, self.N+1, self.S))             # time-varying nonlinear conductances
@@ -251,8 +255,8 @@ class HarmonicBalance:
 
             converged = self.hb_converged(Il, Inl)
             itercnt += 1
-            if converged or itercnt >= maxiter:
-                print('F = {}'.format(F))
+            if (converged and itercnt >= 3) or itercnt >= maxiter:
+                # print('F = {}'.format(F))
                 return V, converged
 
             """ Calculate next voltage guess using NR """
@@ -264,7 +268,8 @@ class HarmonicBalance:
                 V[self.Kk*i+1] = 0.
 
             # print('V = {}'.format(V))
-            print('Iteration {}'.format(itercnt))
+
+        print('Total number of iterations: {}'.format(itercnt))
 
     def hb_converged(self, Il, Inl):
         abstol = self.options['abstol']

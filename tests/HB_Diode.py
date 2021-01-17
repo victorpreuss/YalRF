@@ -21,17 +21,8 @@ d1.options['Area'] = 1
 
 hb = HarmonicBalance('HB1', 1e6, 10)
 
-freqs, Vf, Vt = hb.run(y)
+converged, freqs, Vf, time, Vt = hb.run(y)
 
-n = 1
-plt.figure()
-plt.subplot(211)
-plt.plot(Vt[n,:])
-plt.grid()
-plt.subplot(212)
-plt.stem(freqs, abs(Vf[n,:]), use_line_collection=True, markerfmt='^')
-for f, v in zip(freqs, Vf[n,:]):
-    label = "({:.3f}, {:.1f})".format(abs(v), np.degrees(np.angle(v)))
-    plt.annotate(label, (f,abs(v)), textcoords="offset points", xytext=(0,10), ha='center')
-plt.grid()
+hb.plot_v('n1')
+hb.plot_v('n2')
 plt.show()

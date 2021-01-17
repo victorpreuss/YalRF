@@ -1,0 +1,44 @@
+
+.PARAM Fosc=10e6
+.PARAM Vmag=10e-3
+.PARAM Vphase=0
+
+* VCC
+V1 vc 0 DC 5
+
+* Vbias and dc feed
+V2 vx 0 DC 1
+L1 vx vb 1 
+
+* bias current
+I2 ve 0 DC 2m
+
+* amplifier transistor
+Q1 vc vb ve QMod
+
+* feedback capacitor divider
+C1 ve vb 100p
+C2 0 ve 100p
+
+* dc block to resonating inductor
+C3 vb vind 1u
+
+* inductor to resonate at the oscillation freq
+L2 vy 0 6.1u
+R1 vy vind 0.1
+
+* adding oscprobe
+Vag vz 0 SIN(0 {Vmag} {Fosc} 0 0 {Vphase})
+
+B1 vz vb V={table{freq}=() () () () () ()}
+
+.MODEL Qmod NPN(Is=2e-14 Nf=1 Bf=400 Vaf=100)
+
+.options hbint numfreq=10 STARTUPPERIODS=2
+.HB 10e6
+
+.PRINT HB_TD FORMAT=TECPLOT
+.PRINT HB_FD FORMAT=TECPLOT
+
+.END
+
