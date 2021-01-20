@@ -32,18 +32,39 @@ class MultiToneHarmonicBalance:
         return self.netlist.get_node_idx(node) - 1
 
     def plot_v(self, node):
-        idx = self.get_node_idx(node)
+        n = self.get_node_idx(node)
+
+        freqs = np.zeros((self.K+1,1))
+        Vf = np.zeros((self.K+1,1), dtype=complex)
+
+        freqs[0] = 0
+        Vf[0] = self.V[n*self.S]
+        for k in range(1, self.K+1):
+            i = n * self.S + 2 * (k - 1) + 1
+            freqs[k] = np.abs(self.freqs[k])
+            Vf[k] = self.V[i] + 1j * self.V[i+1] if self.freqs[k] > 0 else self.V[i] - 1j * self.V[i+1]
+
         plt.title('Frequency-domain $V(j \omega)$')
-        plt.stem(self.freqs, abs(self.Vf[idx,:]), use_line_collection=True, markerfmt='^')
-        for f, v in zip(self.freqs, self.Vf[idx,:]):
-            label = r'${:.3f} \angle {:.1f}^\circ $'.format(abs(v), np.degrees(np.angle(v)))
-            plt.annotate(label, (f,abs(v)), textcoords="offset points", xytext=(0,10), ha='center')
+        plt.stem(freqs, np.abs(Vf), use_line_collection=True, markerfmt='^')
+        for f, v in zip(freqs, Vf):
+            label = r'{:.3f} $\angle$ {:.1f}$^\circ$'.format(np.abs(v[0]), np.degrees(np.angle(v[0])))
+            plt.annotate(label, (f, np.abs(v)), textcoords="offset points", xytext=(0,10), ha='center')
         plt.xlabel('frequency [Hz]')
         plt.ylabel('magnitude [V]')
         plt.grid()
         plt.tight_layout()
 
-    def run(self, netlist):
+    def print_v(self, node):
+        n = self.get_node_idx(node)
+        print('Freq [Hz]\tVmag [V]\tPhase [°]')
+        print('{:.2e}\t{:.2e}'.format(np.abs(self.freqs[0]), self.V[n*self.S,0]))
+        for k in range(1, self.K+1):
+            i = n * self.S + 2 * (k - 1) + 1
+            f = np.abs(self.freqs[k])
+            v = self.V[i] + 1j * self.V[i+1] if self.freqs[k] > 0 else self.V[i] - 1j * self.V[i+1]
+            print('{:.2e}\t{:.3e}\t{:.1f}'.format(f, np.abs(v[0]), np.degrees(np.angle(v[0]))))
+
+    def run(self, netlist, V0=None):
 
         self.netlist = netlist.copy()
 
@@ -54,34 +75,45 @@ class MultiToneHarmonicBalance:
         # print option to make large matrices readable
         np.set_printoptions(precision=4, threshold=sys.maxsize, linewidth=160)
 
-        """ Get setup variables """
+        """ Get setup variables and create AFM frequency array """
 
-        self.f1 = self.freq[0]
-        self.f2 = self.freq[1]
+        if isinstance(self.freq, float):
+            self.num_tones = 1
+            self.f1 = self.freq
+            self.K = self.numharmonics
+            self.freqs = self.f1 * np.linspace(0, self.K, self.K+1)
+        elif isinstance(self.freq, list) and len(self.freq) == 2:
+            self.num_tones = 2
+            self.f1 = self.freq[0]
+            self.f2 = self.freq[1]
 
-        self.K1 = self.numharmonics[0]
-        self.K2 = self.numharmonics[1]
-        self.K = (2 * self.K2 + 1) * self.K1 + self.K2
+            self.K1 = self.numharmonics[0]
+            self.K2 = self.numharmonics[1]
+            self.K = (2 * self.K2 + 1) * self.K1 + self.K2
 
-        self.l0 = self.f1 / (2 * self.K2 + 1)
+            self.l0 = self.f1 / (2 * self.K2 + 1)
 
-        self.freqs = np.zeros((self.K+1,1))
-        self.mapfreqs = np.zeros((self.K+1,1))
-        i = 0
-        for k1 in range(self.K1+1):
-            for k2 in range(-self.K2, self.K2+1):
-                if k1 == 0 and k2 < 0:
-                    continue
-                k = (2 * self.K2 + 1) * k1 + k2
-                self.freqs[i] = k1 * self.f1 + k2 * self.f2
-                self.mapfreqs[i] = k * self.l0
-                i += 1
+            self.freqs = np.zeros((self.K+1))
+            self.mapfreqs = np.zeros((self.K+1,1))
+            i = 0
+            for k1 in range(self.K1+1):
+                for k2 in range(-self.K2, self.K2+1):
+                    if k1 == 0 and k2 < 0:
+                        continue
+                    k = (2 * self.K2 + 1) * k1 + k2
+                    self.freqs[i] = k1 * self.f1 + k2 * self.f2
+                    self.mapfreqs[i] = k * self.l0
+                    i += 1
+        else:
+            print('ERROR: only one and two-tones are supported')
                 
         self.S = 2 * self.K + 1
         self.N = self.netlist.get_num_nodes() - 1
         self.W = self.S * self.N
         
         # print('Freqs = {}'.format(self.freqs))
+
+        """ Create DFT and IDFT transformation matrices """
 
         self.DFT = np.ones((self.S,self.S))
         for k in range(self.K):
@@ -110,21 +142,22 @@ class MultiToneHarmonicBalance:
         
         """ Initial voltage estimation for each node V(jw) and v(t) """
 
-        V = self.calc_V0()
-        vt = self.ifft(V)
+        if V0 is None:
+            V = self.calc_V0()
+        else:
+            V = V0
 
         # print('V = {}'.format(V))
-        # print('Vt = {}'.format(vt))
 
         """ Run Harmonic Balance Solver """
 
-        # V, converged = self.hb_loop(Is, Y, V, vt)
+        if V0 is None:
+            converged = False
+        else:
+            V, converged = self.hb_loop(Is, Y, V)
 
         # if first attempt fails, try continuation method
-        converged = False
         if converged == False:
-            V = self.calc_V0()
-            vt = self.ifft(V)
             Vprev = V.copy
 
             maxiter = 100
@@ -133,19 +166,19 @@ class MultiToneHarmonicBalance:
             itercnt = 0
             while (not converged) and (itercnt < maxiter):
 
-                Iscpy = Is.copy()
+                Isalpha = Is.copy()
                 for i in range(self.N):
                     for k in range(1, self.K+1):
-                        Iscpy[self.S*i+2*k-1] *= alpha
-                        Iscpy[self.S*i+2*k] *= alpha
+                        Isalpha[self.S*i+2*k-1] *= alpha
+                        Isalpha[self.S*i+2*k] *= alpha
 
-                print('Alpha = {}'.format(alpha))
+                print('Alpha level: {}'.format(alpha))
 
-                V, issolved = self.hb_loop(Iscpy, Y, V, vt)
+                V, iterconverged = self.hb_loop(Isalpha, Y, V)
 
-                print('Converged: {}\n'.format(issolved))
+                print('HB iteration converged: {}\n'.format(iterconverged))
                 
-                if issolved:
+                if iterconverged:
                     
                     if alpha >= 1.0:
                         converged = True
@@ -166,15 +199,10 @@ class MultiToneHarmonicBalance:
 
                 itercnt += 1
 
-            print('End convergence = {}'.format(converged))
-            print('Source Stepping iterations = {}'.format(itercnt))
+            print('Final convergence: {}'.format(converged))
+            print('Number of source stepping iterations: {}\n'.format(itercnt))
 
-            n = self.netlist.get_node_idx('n2') - 1
-            print('{} {}'.format(np.abs(self.freqs[0]), V[n*self.S]))
-            for k in range(1, self.K+1):
-                i = n * self.S + 2 * (k - 1) + 1
-                v = V[i] + 1j * V[i+1]
-                print('{} {} {}'.format(np.abs(self.freqs[k]), np.abs(v), np.degrees(np.angle(v))))
+        self.V = V
 
         if not converged:
             return False, None, None, None, None
@@ -182,8 +210,9 @@ class MultiToneHarmonicBalance:
         return False, None, None, None, None
         # return converged, self.freqs, self.Vf, self.time, self.Vt
 
-    def hb_loop(self, Is, Y, V, vt):
+    def hb_loop(self, Is, Y, V):
 
+        vf = self.ifft(V)
         it = np.zeros((self.W,1))
         dIdV = np.zeros((self.W,self.W))
 
@@ -273,8 +302,8 @@ class MultiToneHarmonicBalance:
             converged = self.hb_converged(Il, Inl)
             itercnt += 1
             if (converged and itercnt >= 3) or itercnt >= maxiter:
-                print('HB error = {:.2e}'.format(np.sum(np.abs(F))))
-                print('Total number of iterations: {}'.format(itercnt))
+                print('HB total error: {:.2e}'.format(np.sum(np.abs(F))))
+                print('NR number of iterations: {}'.format(itercnt))
                 return V, converged
 
             """ Calculate next voltage guess using NR """
@@ -289,7 +318,6 @@ class MultiToneHarmonicBalance:
                 dV = scipy.linalg.lu_solve((lu, piv), F)
 
             V = V - dV
-            # V = V - scipy.linalg.inv(J) @ F
 
             # print('V = {}'.format(V))
 
@@ -312,24 +340,37 @@ class MultiToneHarmonicBalance:
         Is = np.zeros((self.W, 1))
         for dev in self.lin_devs:
             if isinstance(dev, CurrentSource):
-                iac = dev.ac * np.exp(1j * dev.phase)
-                
-                if dev.freq == self.f1:
-                    fidx = 4 * self.K2 + 1
-                else:
-                    fidx = 1
+                if dev.itype == 'ac':
+                    iac = dev.ac * np.exp(1j * dev.phase)
+                    
+                    if self.num_tones == 1 and dev.freq == self.f1:
+                        fidx = 1
+                    elif self.num_tones == 2:
+                        if dev.freq == self.f1:
+                            fidx = 4 * self.K2 + 1
+                        elif dev.freq == self.f2:
+                            fidx = 1
+                    else:
+                        print('ERROR: only one and two-tones are supported')
 
-                n1 = dev.n1 - 1
-                if n1 >= 0:
-                    Is[S*n1+0] += dev.dc
-                    Is[S*n1+fidx] += iac.real / 2.
-                    Is[S*n1+fidx+1] += iac.imag / 2.
+                    n1 = dev.n1 - 1
+                    if n1 >= 0:
+                        Is[S*n1+fidx] += iac.real / 2.
+                        Is[S*n1+fidx+1] += iac.imag / 2.
 
-                n2 = dev.n2 - 1
-                if n2 >= 0:
-                    Is[S*n2+0] -= dev.dc
-                    Is[S*n2+fidx] -= iac.real / 2.
-                    Is[S*n2+fidx+1] -= iac.imag / 2.
+                    n2 = dev.n2 - 1
+                    if n2 >= 0:
+                        Is[S*n2+fidx] -= iac.real / 2.
+                        Is[S*n2+fidx+1] -= iac.imag / 2.
+
+                elif dev.itype == 'dc':
+                    n1 = dev.n1 - 1
+                    if n1 >= 0:
+                        Is[S*n1] += dev.dc
+
+                    n2 = dev.n2 - 1
+                    if n2 >= 0:
+                        Is[S*n2] -= dev.dc
 
         return Is
 
