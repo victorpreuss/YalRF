@@ -64,7 +64,14 @@ q1.options['Br'] = 5
 q1.options['Vaf'] = 20
 q1.options['Var'] = 10
 
+hb = HarmonicBalance('HB1', 1, 7)
+hb.options['maxiter'] = 50
+Vprev = 0
+
 def objFunc(x, info):
+
+    global hb
+    global Vprev
 
     # get new solution candidates (unnormalized)
     fosc = x[0] * 1.2e9
@@ -75,9 +82,13 @@ def objFunc(x, info):
     Zoscprobe.freq = fosc
 
     # run harmonic balance
-    hb = HarmonicBalance('HB1', fosc, 7)
-    hb.options['maxiter'] = 50
-    converged, freqs, Vf, time, Vt = hb.run(y)
+
+    hb.freq = fosc
+    if info['itercnt'] > 0:
+        converged, freqs, Vf, time, Vt = hb.run(y, Vprev)
+    else:
+        converged, freqs, Vf, time, Vt = hb.run(y)
+    Vprev = hb.X
 
     # if HB failed to converge, return a bad convergence value to minimizer
     if not converged:
@@ -100,15 +111,15 @@ def objFunc(x, info):
 
 b  = [(1.1e9, 1.3e9), (2, 3)]
 x0 = [ 1.2e9 / 1.2e9, 2.8 / 2.5] # normalized
-result = optimize.fmin_bfgs(f        = objFunc,
-                            x0       = x0,
-                            args     = ({'itercnt' : 0},),
-                            gtol     = 1e-5,
-                            epsilon  = 1e-7,
-                            maxiter  = 10,
-                            disp     = True,
-                            retall   = False,
-                            full_output = True)
+# result = optimize.fmin_bfgs(f        = objFunc,
+#                             x0       = x0,
+#                             args     = ({'itercnt' : 0},),
+#                             gtol     = 1e-5,
+#                             epsilon  = 1e-7,
+#                             maxiter  = 10,
+#                             disp     = True,
+#                             retall   = False,
+#                             full_output = True)
 
 
 result = optimize.fmin(func     = objFunc,
@@ -134,7 +145,7 @@ Zoscprobe.freq = fosc
 # run harmonic balance
 hb = HarmonicBalance('HB1', fosc, 7)
 hb.options['maxiter'] = 50
-converged, freqs, Vf, time, Vt = hb.run(y)
+converged, freqs, Vf, time, Vt = hb.run(y, Vprev)
 
 print(result)
 print('Fosc = {}'.format(fosc))

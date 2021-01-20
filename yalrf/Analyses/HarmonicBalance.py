@@ -1,5 +1,7 @@
 import numpy as np
-from scipy import linalg
+import scipy.linalg
+import scipy.sparse
+import scipy.sparse.linalg
 
 from yalrf.Netlist import Netlist
 from yalrf.Analyses import AC, DC
@@ -50,7 +52,7 @@ class HarmonicBalance:
         plt.grid()
         plt.tight_layout()
 
-    def run(self, netlist):
+    def run(self, netlist, V0=None):
 
         self.netlist = netlist.copy()
 
@@ -89,7 +91,12 @@ class HarmonicBalance:
         
         """ Initial voltage estimation for each node V(jw) and v(t) """
 
-        V, vt = self.calc_V0()
+        if V0 is None:
+            V, vt = self.calc_V0()
+        else:
+            V = V0
+            vt = np.zeros((self.N, self.S))
+            self.ifft_V(V, vt)
 
         # print('V = {}'.format(V))
         # print('Vt = {}'.format(vt))
@@ -102,11 +109,14 @@ class HarmonicBalance:
 
         # if first attempt fails, try continuation method
         if converged == False:
-            V, vt = self.calc_V0()
+            # V, vt = self.calc_V0()
             Vprev = V.copy()
 
+            if V0 is None:
+                alpha = 0.1
+            else:
+                alpha = 1.
             maxiter = 100
-            alpha = 0.1
             converged = False
             itercnt = 0
             while (not converged) and (itercnt < maxiter):
@@ -169,6 +179,9 @@ class HarmonicBalance:
         self.time = 2 * self.T / S * np.linspace(0, S, S)
         self.Vt = Vt
         self.Vf = Vf
+
+        # store answer array
+        self.X = V
 
         return converged, self.freqs, self.Vf, self.time, self.Vt
 
@@ -261,7 +274,17 @@ class HarmonicBalance:
 
             """ Calculate next voltage guess using NR """
 
-            V = V - linalg.inv(J) @ F
+            # currently just using standard LU factorization
+            if False:
+                Jn = scipy.sparse.csc_matrix(J)
+                lu = scipy.sparse.linalg.splu(Jn)
+                dV = lu.solve(F)
+            else:
+                lu, piv = scipy.linalg.lu_factor(J)
+                dV = scipy.linalg.lu_solve((lu, piv), F)
+
+            V = V - dV
+            # V = V - linalg.inv(J) @ F
 
             # ensure there is no complex part on the DC voltages
             for i in range(self.N):
