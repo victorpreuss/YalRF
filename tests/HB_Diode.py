@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 
 import setup
 from yalrf import YalRF, Netlist
-from yalrf.Analyses import HarmonicBalance, HarmonicBalance2
+from yalrf.Analyses import HarmonicBalance
 
 y = YalRF('Diode Testbench')
 

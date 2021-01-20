@@ -333,7 +333,7 @@ class Diode():
     # TODO: get_i() and get_g() are temporary implementations
     #       to test the harmonic balance algorithm. Eventually
     #       the complete diode model should be used.
-    def get_i(self, Vd, Vdold):
+    def get_i(self, Vd, Vdold=0):
         Is = self.adjusted_options['Is']
         N  = self.options['N']
         Vt = k * self.options['Temp'] / e
@@ -343,13 +343,13 @@ class Diode():
 
         return Id
 
-    def get_g(self, Vd, Vdold):
+    def get_g(self, Vd, Vdold=0):
         Is = self.adjusted_options['Is']
         N  = self.options['N']
         Vt = k * self.options['Temp'] / e
 
         # Vd = Vdold + 10. * N * Vt * np.tanh((Vd - Vdold) / (10. * N * Vt))
-        g = Is / (N * Vt) * np.exp(Vd / (N * Vt))
+        g = Is / (N * Vt) * exp_lim(Vd / (N * Vt))
 
         return g
 
@@ -359,7 +359,7 @@ class Diode():
 # limit the maximum derivative of the exponential function
 # TODO: improve this to a quadratic approximation
 def exp_lim(x):
-    return np.exp(x) if x < 700. else np.exp(700.) + np.exp(700.) * (x - 700.)
+    return np.exp(x) if x < 200. else np.exp(200.) + np.exp(200.) * (x - 200.)
 
 """
 

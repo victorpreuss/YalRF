@@ -198,7 +198,7 @@ class Netlist():
         self.devices.append(vac)
         return vac
 
-    def add_iac(self, name, n1, n2, ac, phase=0):
+    def add_iac(self, name, n1, n2, ac, phase=0, freq=0):
         """
         Add AC current source to the netlist.
 
@@ -214,6 +214,8 @@ class Netlist():
             AC current value in Amperes.
         phase : float
             Phase of the AC current source
+        freq : float
+            Frequency of the fundamental for HB analysis
 
         Returns
         -------
@@ -224,7 +226,7 @@ class Netlist():
         n1 = self.add_node(n1)
         n2 = self.add_node(n2)
         
-        iac = CurrentSource(name, n1, n2, itype='ac', ac=ac, phase=phase)
+        iac = CurrentSource(name, n1, n2, itype='ac', ac=ac, phase=phase, freq=freq)
         self.devices.append(iac)
         return iac
 

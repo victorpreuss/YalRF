@@ -2,7 +2,7 @@ import numpy as np
 
 class CurrentSource():
     
-    def __init__(self, name, n1, n2, dc=0, ac=0, phase=0, itype=None):
+    def __init__(self, name, n1, n2, dc=0, ac=0, phase=0, freq=0, itype=None):
         self.name = name
         self.n1 = n1
         self.n2 = n2
@@ -10,6 +10,7 @@ class CurrentSource():
         self.dc = float(dc)
         self.ac = float(ac)
         self.phase = np.radians(float(phase))
+        self.freq = float(freq)
 
     def get_num_vsources(self):
         return 0
