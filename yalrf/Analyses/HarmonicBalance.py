@@ -181,7 +181,7 @@ class HarmonicBalance:
         self.Vf = Vf
 
         # store answer array
-        self.X = V
+        self.V = V
 
         return converged, self.freqs, self.Vf, self.time, self.Vt
 

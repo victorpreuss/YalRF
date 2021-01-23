@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 
 import setup
 from yalrf import YalRF, Netlist
-from yalrf.Analyses import HarmonicBalance
+from yalrf.Analyses import HarmonicBalance, MultiToneHarmonicBalance
 
 y = Netlist('Differential Amplifier')
 
@@ -19,12 +19,12 @@ i1 = y.add_idc('I1', 'nx', 'gnd', dc=vcc)
 g1 = y.add_gyrator('G1', 'nx', 'nvcc', 'gnd', 'gnd', 1)
 
 # vin1
-i2 = y.add_iac('I2', 'ny', 'gnd', ac=vin, phase=-90)
+i2 = y.add_iac('I2', 'ny', 'gnd', ac=vin, phase=-90, freq=10e6)
 i3 = y.add_idc('I3', 'ny', 'gnd', dc=vbias)
 g2 = y.add_gyrator('G2', 'ny', 'nb1', 'gnd', 'gnd', 1)
 
 # vin2
-i4 = y.add_iac('I4', 'nz', 'gnd', ac=vin, phase=+90)
+i4 = y.add_iac('I4', 'nz', 'gnd', ac=vin, phase=+90, freq=10e6)
 i5 = y.add_idc('I5', 'nz', 'gnd', dc=vbias)
 g3 = y.add_gyrator('G3', 'nz', 'nb2', 'gnd', 'gnd', 1)
 
@@ -50,10 +50,12 @@ q3.options = q1.options
 q4.options = q1.options
 
 # run harmonic balance
-hb = HarmonicBalance('HB1', 10e6, 10)
-hb.options['maxiter'] = 50
+# hb = HarmonicBalance('HB1', 10e6, 10)
+hb = MultiToneHarmonicBalance('HB1', 10e6, 20)
+hb.options['maxiter'] = 100
 converged, freqs, Vf, time, Vt = hb.run(y)
 
+hb.print_v('nc1')
 hb.plot_v('nc1')
-hb.plot_v('nc2')
+# hb.plot_v('nc2')
 plt.show()

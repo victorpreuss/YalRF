@@ -7,65 +7,50 @@ import setup
 from yalrf import YalRF, Netlist
 from yalrf.Analyses import HarmonicBalance, MultiToneHarmonicBalance
 
-
 y = Netlist('Oscillator')
 
 # circuit parameters
-vcc = 5
-vin = 0
-c1 = 3.3e-12
-c2 = 3.9e-12
-r1 = 3e3
-r2 = 6.8e3
-re = 1.5e3
-l1 = 10e-9
-
-freq = 1.2e9
+vcc = 3
+vee = -3
+rb = 100
+re = 2.2e3
+l = 5e-6
+c1 = 200e-12
+c2 = 200e-12
+freq = 0
 
 # VCC
-y.add_idc('I1', 'nx', 'gnd', dc=vcc)
-y.add_gyrator('G1', 'nx', 'nvcc', 'gnd', 'gnd', 1)
+y.add_idc('I1', 'nx1', 'gnd', dc=vcc)
+y.add_gyrator('G1', 'nx1', 'nvcc', 'gnd', 'gnd', 1)
+
+# VEE
+y.add_idc('I2', 'nx2', 'gnd', dc=vee)
+y.add_gyrator('G2', 'nx2', 'nvee', 'gnd', 'gnd', 1)
 
 # vin oscprobe
-Voscprobe = y.add_iac('I2', 'ny', 'gnd', ac=vin, phase=0)
-y.add_gyrator('G2', 'ny', 'nz', 'gnd', 'gnd', 1)
+Voscprobe = y.add_iac('I3', 'nx3', 'gnd', ac=0)
+y.add_gyrator('G3', 'nx3', 'nz', 'gnd', 'gnd', 1)
 
 # ideal harmonic filter of oscprobe
-Zoscprobe = y.add_idealharmonicfilter('X1', 'nz', 'nind', freq)
+Zoscprobe = y.add_idealharmonicfilter('X1', 'nz', 'nc', freq)
+Zoscprobe.g = 1e6
 
-# bias resistors
-y.add_resistor('R1', 'nvcc', 'nb', r1)
-y.add_resistor('R2', 'nb', 'gnd', r2)
+# passives
+y.add_resistor('Rb', 'nb', 'gnd', rb)
+y.add_resistor('Re', 'ne', 'nvee', re)
+y.add_resistor('Rx', 'nvcc', 'nc', re)
+y.add_inductor('L1', 'nvcc', 'nc', l)
+y.add_capacitor('C1', 'nvcc', 'ne', c1)
+y.add_capacitor('C2', 'ne', 'nc', c2)
 
-# emitter resistance
-y.add_resistor('RE', 'ne', 'gnd', re)
-
-# capacitor feedback network
-y.add_capacitor('C1', 'nb', 'ne', c1)
-y.add_capacitor('C2', 'ne', 'gnd', c2)
-
-# resonating inductor
-y.add_inductor('L1', 'nind', 'gnd', l1)
-
-# dc feed and dc block (TODO: improve)
-y.add_inductor('Lfeed', 'nvcc', 'nc', 1e-3)
-y.add_capacitor('Cblk1', 'nb', 'nind', 1e-6)
-
-# load connection
-y.add_capacitor('Cblk2', 'nc', 'nl', 1e-6)
-y.add_resistor('RL', 'nl', 'gnd', 50)
-
-# bjt
+# bjts
 q1 = y.add_bjt('Q1', 'nb', 'nc', 'ne')
 
 q1.options['Is'] = 1e-15
-q1.options['Bf'] = 100
-q1.options['Br'] = 5
-q1.options['Vaf'] = 20
-q1.options['Var'] = 10
+q1.options['Bf'] = 200
+q1.options['Br'] = 1
 
 hb = MultiToneHarmonicBalance('HB1', 1, 10)
-# hb = HarmonicBalance('HB1', 1, 7)
 hb.options['maxiter'] = 100
 Vprev = 0
 
@@ -97,7 +82,7 @@ def objFunc(x, info):
         return 1e6
 
     # get nodes of IdealHarmonicFilter
-    n1 = hb.get_node_idx('nind')
+    n1 = hb.get_node_idx('nc')
     n2 = hb.get_node_idx('nz')
 
     # mag(Yosc) is the objective function to be minimized
@@ -106,30 +91,18 @@ def objFunc(x, info):
     Yosc  = Iosc / Voscx
 
     info['itercnt'] += 1
-    print('\nIter\tFreq [GHz]\tVosc [V]\tmag(Yosc)')
-    print('{}\t{:.8f}\t{:.8f}\t{:.2e}\n'.format(info['itercnt'], fosc / 1e9, Vosc, abs(Yosc)))
+    print('\nIter\tFreq [kHz]\tVosc [V]\tmag(Yosc)')
+    print('{}\t{:.8f}\t{:.8f}\t{:.2e}\n'.format(info['itercnt'], fosc / 1e3, Vosc, abs(Yosc)))
 
     return abs(Yosc)
 
-b  = [(1.1e9, 1.3e9), (2, 3)]
-x0 = [ 1.4e9, 1]
-# result = optimize.fmin_bfgs(f        = objFunc,
-#                             x0       = x0,
-#                             args     = ({'itercnt' : 0},),
-#                             gtol     = 1e-5,
-#                             epsilon  = 1e-7,
-#                             maxiter  = 10,
-#                             disp     = True,
-#                             retall   = False,
-#                             full_output = True)
-
-
+x0 = [ 5e6, .5]
 result = optimize.fmin(func     = objFunc,
                        x0       = x0,
                        args     = ({'itercnt' : 0},),
                        xtol     = 1e-5,
                        ftol     = 1e-5,
-                       maxfun   = 100,
+                       maxfun   = 200,
                        disp     = True,
                        retall   = False,
                        full_output = True)
@@ -147,14 +120,14 @@ Zoscprobe.freq = fosc
 
 # run harmonic balance
 hb = MultiToneHarmonicBalance('HB1', fosc, 10)
-# hb = HarmonicBalance('HB1', fosc, 7)
 converged, freqs, Vf, time, Vt = hb.run(y, Vprev)
 
 print('Frequency of oscillation = {} Hz'.format(fosc))
 print('Oscillation amplitude = {} V'.format(Vosc))
 
-# hb.plot_v('nb')
-# hb.plot_v('nl')
+# hb.plot_v('nc')
+# hb.plot_v('ne')
 # plt.show()
+hb.print_v('nc')
 
 

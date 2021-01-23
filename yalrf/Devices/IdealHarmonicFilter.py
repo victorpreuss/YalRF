@@ -6,6 +6,9 @@ class IdealHarmonicFilter():
         self.n2   = n2
         self.freq = float(value)
 
+        # conductance of 'shorted' harmonics
+        self.g = 1e9
+
     def get_num_vsources(self):
         return 0
 
@@ -19,7 +22,7 @@ class IdealHarmonicFilter():
         pass
 
     def add_ac_stamps(self, A, z, x, iidx, freq):
-        g = 1e9 if freq == self.freq else 0.
+        g = self.g if freq == self.freq else 0.
         A[self.n1][self.n1] = A[self.n1][self.n1] + g
         A[self.n2][self.n2] = A[self.n2][self.n2] + g
         A[self.n1][self.n2] = A[self.n1][self.n2] - g
