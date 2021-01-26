@@ -77,6 +77,9 @@ class BJT():
         self.Vbeold = 0.
         self.Vbcold = 0.
 
+        self.VbeoldHB = None
+        self.VbcoldHB = None
+
         self.Ib = []
         self.Ic = []
 
@@ -448,10 +451,10 @@ class BJT():
 
         return Vbe, Vbc
 
-    # TODO: get_i() and get_g() are temporary implementations to test
+    # TODO: get_hb_params() is a temporary implementations to test
     #       the harmonic balance algorithm. Eventually the complete
     #       BJT model should be used.
-    def get_i(self, Vb, Vc, Ve, Vs):
+    def get_hb_params(self, Vb, Vc, Ve, Vs, s):
         Vt  = k * self.options['Temp'] / e
         Is  = self.adjusted_options['Is'] 
         Nf  = self.options['Nf'] 
@@ -466,24 +469,51 @@ class BJT():
         Nc  = self.options['Nc'] 
         Bf  = self.options['Bf'] 
         Br  = self.options['Br'] 
+        Cje = self.adjusted_options['Cje']
+        Vje = self.options['Vje']
+        Mje = self.options['Mje']
+        Cjc = self.adjusted_options['Cjc']
+        Vjc = self.options['Vjc']
+        Mjc = self.options['Mjc']
+        Cjs = self.adjusted_options['Cjs']
+        Vjs = self.options['Vjs']
+        Mjs = self.options['Mjs']
+        Fc = self.options['Fc']
+        Xcjc = self.options['Xcjc']
+        Tf = self.options['Tf']
+        Xtf = self.options['Xtf']
+        Vtf = self.options['Vtf']
+        Itf = self.adjusted_options['Itf']
+        Tr = self.options['Tr']
 
-        Vbe = Vb - Ve
-        Vbc = Vb - Vc
-        Vsc = Vs - Vc
+        # TODO: improve this later
+        Vbe = Vb - Ve + 1e-6
+        Vbc = Vb - Vc + 1e-6
+        Vsc = Vs - Vc + 1e-6
+
+        # Vbe = self.VbeoldHB[s] + 10. * Nf * Vt * np.tanh((Vbe - self.VbeoldHB[s]) / (10. * Nf * Vt)) + 1e-6
+        # Vbc = self.VbcoldHB[s] + 10. * Nr * Vt * np.tanh((Vbc - self.VbcoldHB[s]) / (10. * Nr * Vt)) + 1e-6
+
+        self.VbeoldHB[s] = Vbe
+        self.VbcoldHB[s] = Vbc
+
+        # print(Vbe)
+        # print(Vbc)
 
         gmin = 1e-12
+        cmin = 1e-18
         
         If = Is * (exp_lim(Vbe / (Nf * Vt)) - 1.)
 
         Ibei = If / Bf
-        Iben = Ise * (exp_lim(Vbe / (Ne * Vt)) - 1.) + gmin * Vbe
-        Ibe  = Ibei + Iben
+        Iben = Ise * (exp_lim(Vbe / (Ne * Vt)) - 1.)
+        Ibe  = Ibei + Iben + gmin * Vbe
 
         Ir = Is * (exp_lim(Vbc / (Nr * Vt)) - 1.)
 
         Ibci = Ir / Br
-        Ibcn = Isc * (exp_lim(Vbc / (Nc * Vt)) - 1.) + gmin * Vbc
-        Ibc  = Ibci + Ibcn
+        Ibcn = Isc * (exp_lim(Vbc / (Nc * Vt)) - 1.)
+        Ibc  = Ibci + Ibcn + gmin * Vbc
 
         Q1 = 1. / (1. - (Vbc / Vaf) - (Vbe / Var))
         Q2 = (If / Ikf) + (Ir / Ikr)
@@ -495,44 +525,13 @@ class BJT():
         Ic = It - Ibc
         Ie = Ib + Ic
 
-        return Ib, Ic, Ie
-
-    def get_g(self, Vb, Vc, Ve, Vs):
-        Vt  = k * self.options['Temp'] / e
-        Is  = self.adjusted_options['Is'] 
-        Nf  = self.options['Nf'] 
-        Nr  = self.options['Nr'] 
-        Ikf = self.adjusted_options['Ikf']
-        Ikr = self.adjusted_options['Ikr']
-        Vaf = self.options['Vaf']
-        Var = self.options['Var']
-        Ise = self.adjusted_options['Ise']
-        Ne  = self.options['Ne'] 
-        Isc = self.adjusted_options['Isc']
-        Nc  = self.options['Nc'] 
-        Bf  = self.options['Bf'] 
-        Br  = self.options['Br'] 
-
-        Vbe = Vb - Ve
-        Vbc = Vb - Vc
-        Vsc = Vs - Vc
-
-        gmin = 1e-12
-        
         gbei = Is / (Nf * Vt * Bf) * exp_lim(Vbe / (Nf * Vt))
-        gben = Ise / (Ne * Vt) * exp_lim(Vbe / (Ne * Vt)) + gmin
-        gpi  = gbei + gben
+        gben = Ise / (Ne * Vt) * exp_lim(Vbe / (Ne * Vt))
+        gpi  = gbei + gben + gmin
 
         gbci = Is / (Nr * Vt * Br) * exp_lim(Vbc / (Nr * Vt))
-        gbcn = Isc / (Nc * Vt) * exp_lim(Vbc / (Nc * Vt)) + gmin
-        gmu  = gbci + gbcn
-
-        If = Is * (exp_lim(Vbe / (Nf * Vt)) - 1.)
-        Ir = Is * (exp_lim(Vbc / (Nr * Vt)) - 1.)
-
-        Q1 = 1. / (1. - (Vbc / Vaf) - (Vbe / Var))
-        Q2 = (If / Ikf) + (Ir / Ikr)
-        Qb = (Q1 / 2.) * (1. + np.sqrt(1. + 4. * Q2))
+        gbcn = Isc / (Nc * Vt) * exp_lim(Vbc / (Nc * Vt))
+        gmu  = gbci + gbcn + gmin
 
         gif = gbei * Bf
         gir = gbci * Br
@@ -540,19 +539,49 @@ class BJT():
         dQb_dVbe = Q1 * ((Qb / Var) + (gif / (Ikf * np.sqrt(1. + 4. * Q2))))
         dQb_dVbc = Q1 * ((Qb / Vaf) + (gir / (Ikr * np.sqrt(1. + 4. * Q2))))
 
-        It = (If - Ir) / Qb
-
         gmf = (1. / Qb) * (+ gif - It * dQb_dVbe)
         gmr = (1. / Qb) * (- gir - It * dQb_dVbc)
 
-        return gmu, gpi, gmf, gmr
+        if Vbe <= Fc * Vje:
+            Cbedep = Cje * np.power((1. - (Vbe / Vje)), -Mje)
+        else:
+            Cbedep = Cje / np.power((1. - Fc), Mje) * (1. + Mje * (Vbe - Fc * Vje) / (Vje * (1. - Fc)))
+
+        if Vbc <= Fc * Vjc:
+            Cbcdep = Cjc * np.power((1. - (Vbc / Vjc)), -Mjc)
+        else:
+            Cbcdep = Cjc / np.power((1. - Fc), Mjc) * (1. + Mjc * (Vbc - Fc * Vjc) / (Vjc * (1. - Fc)))
+
+        if Vsc <= 0:
+            Cscdep = Cjs * np.power((1. - (Vsc / Vjs)), -Mjs)
+        else:
+            Cscdep = Cjs * (1. + Mjs * Vsc / Vjs)
+
+        Tff = Tf * (1. + Xtf * np.square(If / (If + Itf)) * exp_lim(Vbc / (1.44 * Vtf)))
+        dTff_dVbe = Tf * Xtf * 2 * gif * If * Itf * exp_lim(Vbc / (1.44 * Vtf))
+        dTff_dVbc = (Tf * Xtf / (1.44 * Vtf)) * np.square(If / (If + Itf)) * exp_lim(Vbc / (1.44 * Vtf))
+
+        Cbcidep = Xcjc * Cbcdep
+        Cbcxdep = (1. - Xcjc) * Cbcdep 
+        Cbcdiff = Tr * gir
+        Cbediff = (1. / Qb) * (If * dTff_dVbe + Tff * (gif - (If / Qb) * dQb_dVbe))
+        Cbebc = (If / Qb) * (dTff_dVbc - (Tff / Qb) * dQb_dVbc) + cmin
+
+        if Xcjc != 1.:
+            print('WARNING: external base-collector capacitance is currently unsupported')
+
+        Cbc = Cbcidep + Cbcdiff + cmin
+        Cbe = Cbedep + Cbediff + cmin
+        Csc = Cscdep + cmin
+
+        return Ib, Ic, Ie, gmu, gpi, gmf, gmr, Cbc, Cbe, Cbebc, Csc
 
     def __str__(self):
         return 'BJT: {}\nNodes BCE nodes = {}, {}, {}\n'.format(self.name, self.n1, self.n2, self.n3)
 
 # limit the maximum derivative of the exponential function
 def exp_lim(x):
-    return np.exp(x) if x < 100. else np.exp(100.) + np.exp(100.) * (x - 100.)
+    return np.exp(x) if x < 200. else np.exp(200.) + np.exp(200.) * (x - 200.)
 
 """
 

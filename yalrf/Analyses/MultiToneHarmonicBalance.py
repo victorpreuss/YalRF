@@ -33,22 +33,11 @@ class MultiToneHarmonicBalance:
 
     def plot_v(self, node):
         n = self.get_node_idx(node)
-
-        freqs = np.zeros((self.K+1,1))
-        Vf = np.zeros((self.K+1,1), dtype=complex)
-
-        freqs[0] = 0
-        Vf[0] = self.V[n*self.S]
-        for k in range(1, self.K+1):
-            i = n * self.S + 2 * (k - 1) + 1
-            freqs[k] = np.abs(self.freqs[k])
-            Vf[k] = self.V[i] + 1j * self.V[i+1] if self.freqs[k] > 0 else self.V[i] - 1j * self.V[i+1]
-
         plt.figure(figsize=(10,6))
         plt.title('Frequency-domain $V(j \omega)$')
-        plt.stem(freqs, np.abs(Vf), use_line_collection=True, markerfmt='^')
-        for f, v in zip(freqs, Vf):
-            label = r'{:.3f} $\angle$ {:.1f}$^\circ$'.format(np.abs(v[0]), np.degrees(np.angle(v[0])))
+        plt.stem(self.freqs, np.abs(self.Vf[n]), use_line_collection=True, markerfmt='^')
+        for f, v in zip(self.freqs, self.Vf[n]):
+            label = r'{:.3f} $\angle$ {:.1f}$^\circ$'.format(np.abs(v), np.degrees(np.angle(v)))
             plt.annotate(label, (f, np.abs(v)), textcoords="offset points", xytext=(0,5), ha='left', va='bottom', rotation=45)
         plt.xlabel('frequency [Hz]')
         plt.ylabel('magnitude [V]')
@@ -58,17 +47,14 @@ class MultiToneHarmonicBalance:
     def print_v(self, node):
         n = self.get_node_idx(node)
         print('Freq [Hz]\tVmag [V]\tPhase [°]')
-        print('{:.2e}\t{:.2e}'.format(np.abs(self.freqs[0]), self.V[n*self.S,0]))
-        for k in range(1, self.K+1):
-            i = n * self.S + 2 * (k - 1) + 1
-            f = np.abs(self.freqs[k])
-            v = self.V[i] + 1j * self.V[i+1] if self.freqs[k] > 0 else self.V[i] - 1j * self.V[i+1]
-            print('{:.2e}\t{:.3e}\t{:.1f}'.format(f, np.abs(v[0]), np.degrees(np.angle(v[0]))))
+        for k in range(0, self.K+1):
+            v = self.Vf[n,k]
+            print('{:.2e}\t{:.3e}\t{:.1f}'.format(self.freqs[k], np.abs(v), np.degrees(np.angle(v))))
 
-    # returns the trigonometric representation
-    # def get_v(self, node):
-    #     n = self.get_node_idx(node)
-    #     v = self.Vf[n1]
+    def get_v(self, node):
+        n = self.get_node_idx(node)
+        v = self.Vf[n]
+        return v
 
     def run(self, netlist, V0=None):
 
@@ -107,7 +93,7 @@ class MultiToneHarmonicBalance:
                     if k1 == 0 and k2 < 0:
                         continue
                     k = (2 * self.K2 + 1) * k1 + k2
-                    self.freqs[i] = k1 * self.f1 + k2 * self.f2
+                    self.freqs[i] = np.abs(k1 * self.f1 + k2 * self.f2)
                     self.mapfreqs[i] = k * self.l0
                     i += 1
         else:
@@ -117,22 +103,22 @@ class MultiToneHarmonicBalance:
         self.N = self.netlist.get_num_nodes() - 1
         self.W = self.S * self.N
         
-        # print('Freqs = {}'.format(self.freqs))
+        print('Freqs = {}'.format(self.freqs))
 
         """ Create DFT and IDFT transformation matrices """
 
         self.DFT = np.ones((self.S,self.S))
         for k in range(self.K):
             for s in range(self.S):
-                self.DFT[2*k+1,s] = np.cos(2*np.pi*(k+1)*s/self.S);
-                self.DFT[2*k+2,s] = - np.sin(2*np.pi*(k+1)*s/self.S);
+                self.DFT[2*k+1,s] = 2 * np.cos(2*np.pi*(k+1)*s/self.S);
+                self.DFT[2*k+2,s] = 2 * np.sin(2*np.pi*(k+1)*s/self.S);
         self.DFT = self.DFT / self.S;
 
         self.IDFT = np.ones((self.S,self.S))
         for s in range(self.S):
             for k in range(self.K):
-                self.IDFT[s,2*k+1] = 2 * np.cos(2*np.pi*(k+1)*s/self.S)
-                self.IDFT[s,2*k+2] = - 2 * np.sin(2*np.pi*(k+1)*s/self.S)
+                self.IDFT[s,2*k+1] = np.cos(2*np.pi*(k+1)*s/self.S)
+                self.IDFT[s,2*k+2] = np.sin(2*np.pi*(k+1)*s/self.S)
 
         """ Independent current sources (Is) """
 
@@ -166,7 +152,7 @@ class MultiToneHarmonicBalance:
 
         # if first attempt fails, try continuation method
         if converged == False:
-            Vprev = V.copy
+            Vprev = V.copy()
             maxiter = 100
             alpha = 0.01
             converged = False
@@ -175,7 +161,6 @@ class MultiToneHarmonicBalance:
 
                 Isalpha = Is.copy()
                 for n in range(self.N):
-                    Isalpha[self.S*n] *= alpha
                     for k in range(1, self.K+1):
                         Isalpha[self.S*n+2*k-1] *= alpha
                         Isalpha[self.S*n+2*k] *= alpha
@@ -197,7 +182,7 @@ class MultiToneHarmonicBalance:
                         alpha = 1.0
 
                 else:
-                    V = Vprev
+                    V = Vprev.copy()
                     vt = self.ifft(V)
                     alpha = alpha / 1.1
                     if alpha <= 0.001:
@@ -214,28 +199,46 @@ class MultiToneHarmonicBalance:
 
         self.V = V
 
-        # Vf is an array with the complex Fourier coefficient
-        # TODO: check if conjugating the answer for negative frequencies
-        #       is the correct approach here.
+        # Vf is an array with the voltage phasor at each node for all frequencies
         self.Vf = np.zeros((self.N,self.K+1), dtype=complex)
         for n in range(self.N):
             self.Vf[n,0] = self.V[n*self.S,0]
             for k in range(1, self.K+1):
                 i = n * self.S + 2 * (k - 1) + 1
-                if self.freqs[k] > 0:
-                    self.Vf[n,k] = self.V[i,0] + 1j * self.V[i+1,0]
-                else:
-                    self.Vf[n,k] = self.V[i,0] - 1j * self.V[i+1,0]
-        self.freqs = np.abs(self.freqs)
+                An  = np.sqrt(self.V[i,0]**2 + self.V[i+1,0]**2)
+                phi = np.arctan2(self.V[i+1,0], self.V[i,0])
+                self.Vf[n,k] = An * np.exp(1j * phi)
 
         return converged, self.freqs, self.Vf, None, None
         # return converged, self.freqs, self.Vf, self.time, self.Vt
 
     def hb_loop(self, Is, Y, V):
 
-        vf = self.ifft(V)
+        vt = self.ifft(V)
         it = np.zeros((self.W,1))
         dIdV = np.zeros((self.W,self.W))
+        dQdV = np.zeros((self.W,self.W))
+        Omega = np.zeros((self.W,self.W))
+
+        for n in range(self.N):
+            for k in range(1,self.K+1):
+                i = n * self.S + 2 * (k - 1) + 1
+                omega = 2 * np.pi * self.freqs[k]
+                y = np.array([[0, omega],[omega, 0]])
+                # y = np.array([[omega, 0],[0, omega]])
+                Omega[i:i+2,i:i+2] = y
+
+        # initialize variables for PN junction limiting
+        for dev in self.nonlin_devs:
+            if isinstance(dev, BJT):
+                B = dev.n1 - 1
+                C = dev.n2 - 1
+                E = dev.n3 - 1
+                Vb = vt[B*self.S:(B+1)*self.S] if B >= 0 else 0
+                Vc = vt[C*self.S:(C+1)*self.S] if C >= 0 else 0
+                Ve = vt[E*self.S:(E+1)*self.S] if E >= 0 else 0
+                dev.VbeoldHB = Vb - Ve
+                dev.VbcoldHB = Vb - Vc
 
         converged = False
         maxiter = self.options['maxiter']
@@ -245,13 +248,6 @@ class MultiToneHarmonicBalance:
             """ Time-domain v(t) """
 
             # vtold = vt.copy()
-
-            # for k in range(1, self.K+1):
-            #     if self.freqs[k] < 0:
-            #         for n in range(self.N):
-            #             i = n * self.S + 2 * (k - 1) + 2
-            #             V[i] = - V[i]
-
             vt = self.ifft(V)
 
             # print('vt = {}'.format(vt))
@@ -307,24 +303,34 @@ class MultiToneHarmonicBalance:
                     gmf = np.zeros((self.S))
                     gmr = np.zeros((self.S))
 
+                    Cbe = np.zeros((self.S))
+                    Cbc = np.zeros((self.S))
+                    Cbebc = np.zeros((self.S))
+                    Csc = np.zeros((self.S))
+
                     for s in range(self.S):
                         Vb = vt[B*self.S+s] if B >= 0 else 0
                         Vc = vt[C*self.S+s] if C >= 0 else 0
                         Ve = vt[E*self.S+s] if E >= 0 else 0
                         Vs = 0
 
-                        Ib[s], Ic[s], Ie[s] = dev.get_i(Vb, Vc, Ve, Vs)
-                        gmu[s], gpi[s], gmf[s], gmr[s] = dev.get_g(Vb, Vc, Ve, Vs)
+                        Ib[s], Ic[s], Ie[s], gmu[s], gpi[s], gmf[s], gmr[s], Cbc[s], Cbe[s], Cbebc[s], Csc[s] = dev.get_hb_params(Vb, Vc, Ve, Vs, s)
 
                     gmuf = self.DFT @ np.diag(gmu) @ self.IDFT
                     gpif = self.DFT @ np.diag(gpi) @ self.IDFT
                     gmff = self.DFT @ np.diag(gmf) @ self.IDFT
                     gmrf = self.DFT @ np.diag(gmr) @ self.IDFT
 
+                    Cbef = self.DFT @ np.diag(Cbe) @ self.IDFT
+                    Cbcf = self.DFT @ np.diag(Cbc) @ self.IDFT
+                    Cbebcf = self.DFT @ np.diag(Cbebc) @ self.IDFT
+                    Cscf = self.DFT @ np.diag(Csc) @ self.IDFT
+
                     if B >= 0:
                         i = B * self.S
                         j = i + self.S
                         dIdV[i:j,i:j] += (gmuf + gpif)
+                        dQdV[i:j,i:j] += (Cbcf + Cbef + Cbebcf)
                         it[i:j] += Ib
 
                         if C >= 0:
@@ -332,17 +338,22 @@ class MultiToneHarmonicBalance:
                             y = x + self.S
                             dIdV[i:j,x:y] += (- gmuf)
                             dIdV[x:y,i:j] += (- gmuf + gmff + gmrf)
+                            dQdV[i:j,x:y] += (- Cbcf - Cbebcf)
+                            dQdV[x:y,i:j] += (- Cbcf)
 
                         if E >= 0:
                             x = E * self.S
                             y = x + self.S
                             dIdV[i:j,x:y] += (- gpif)
                             dIdV[x:y,i:j] += (- gpif - gmff - gmrf)
+                            dQdV[i:j,x:y] += (- Cbef)
+                            dQdV[x:y,i:j] += (- Cbef - Cbebcf)
 
                     if C >= 0:
                         i = C * self.S
                         j = i + self.S
-                        dIdV[i:j,i:j] += (gmuf - gmrf)
+                        dIdV[i:j,i:j] += (+ gmuf - gmrf)
+                        dQdV[i:j,i:j] += (+ Cbcf + Cscf)
                         it[i:j] += Ic
 
                         if E >= 0:
@@ -350,16 +361,19 @@ class MultiToneHarmonicBalance:
                             y = x + self.S
                             dIdV[i:j,x:y] += (- gmff)
                             dIdV[x:y,i:j] += (+ gmrf)
+                            dQdV[i:j,x:y] += 0.
+                            dQdV[x:y,i:j] += (+ Cbebcf)
 
                     if E >= 0:
                         i = E * self.S
                         j = i + self.S
-                        dIdV[i:j,i:j] += (gpif + gmff)
+                        dIdV[i:j,i:j] += (+ gpif + gmff)
+                        dQdV[i:j,i:j] += (+ Cbef)
                         it[i:j] -= Ie
 
             """ Calculating the Jacobian Matrix J(jw) """
 
-            J = Y + dIdV # + Omega * dQdV
+            J = Y + dIdV + Omega * dQdV
 
             # print('J = {}'.format(J))
 
@@ -370,12 +384,6 @@ class MultiToneHarmonicBalance:
             """ Nonlinear current Inl(jw) """
 
             Inl = self.fft(it)
-
-            # for k in range(1, self.K+1):
-            #     if self.freqs[k] < 0:
-            #         for n in range(self.N):
-            #             i = n * self.S + 2 * (k - 1) + 2
-            #             Inl[i] = - Inl[i]
 
             """ Calculate error function F(jw) """
 
@@ -441,13 +449,13 @@ class MultiToneHarmonicBalance:
 
                     n1 = dev.n1 - 1
                     if n1 >= 0:
-                        Is[S*n1+fidx] += iac.real / 2.
-                        Is[S*n1+fidx+1] += iac.imag / 2.
+                        Is[S*n1+fidx] += iac.real
+                        Is[S*n1+fidx+1] += iac.imag
 
                     n2 = dev.n2 - 1
                     if n2 >= 0:
-                        Is[S*n2+fidx] -= iac.real / 2.
-                        Is[S*n2+fidx+1] -= iac.imag / 2.
+                        Is[S*n2+fidx] -= iac.real
+                        Is[S*n2+fidx+1] -= iac.imag
 
                 elif dev.itype == 'dc':
                     n1 = dev.n1 - 1
@@ -462,13 +470,15 @@ class MultiToneHarmonicBalance:
 
     def calc_Y(self):
         Y = np.zeros((self.W, self.W))
+        gmin = 1e-12
+        gmax = 1e7
         for dev in self.lin_devs:
 
             # add DC stamps for linear devices
             if isinstance(dev, Resistor):
                 n = (dev.n1 - 1) * self.S
                 m = (dev.n2 - 1) * self.S
-                y = 1. / dev.R
+                y = 1. / dev.R + gmin
                 if (dev.n1 > 0):
                     Y[n,n] += y
                 if (dev.n2 > 0):
@@ -477,11 +487,20 @@ class MultiToneHarmonicBalance:
                     Y[n,m] -= y
                     Y[m,n] -= y
             elif isinstance(dev, (Capacitor, IdealHarmonicFilter)):
-                pass
+                n = (dev.n1 - 1) * self.S
+                m = (dev.n2 - 1) * self.S
+                y = gmin
+                if (dev.n1 > 0):
+                    Y[n,n] += y
+                if (dev.n2 > 0):
+                    Y[m,m] += y
+                if (dev.n1 > 0 and dev.n2 > 0):
+                    Y[n,m] -= y
+                    Y[m,n] -= y
             elif isinstance(dev, Inductor):
                 n = (dev.n1 - 1) * self.S
                 m = (dev.n2 - 1) * self.S
-                y = 1e9
+                y = gmax
                 if (dev.n1 > 0):
                     Y[n,n] += y
                 if (dev.n2 > 0):
@@ -509,11 +528,11 @@ class MultiToneHarmonicBalance:
 
             # add AC stamps for linear devices
             for k in range(1, self.K+1):
-                f = np.abs(self.freqs[k])
+                f = self.freqs[k]
                 if isinstance(dev, Resistor):
                     n = (dev.n1 - 1) * self.S + 2 * (k - 1) + 1
                     m = (dev.n2 - 1) * self.S + 2 * (k - 1) + 1
-                    y = 1. / dev.R
+                    y = 1. / dev.R + gmin
                     Ymnk = np.array([[y, 0],[0, y]])
                     if (dev.n1 > 0):
                         Y[n:n+2,n:n+2] += Ymnk 
@@ -525,8 +544,8 @@ class MultiToneHarmonicBalance:
                 elif isinstance(dev, Capacitor):
                     n = (dev.n1 - 1) * self.S + 2 * (k - 1) + 1
                     m = (dev.n2 - 1) * self.S + 2 * (k - 1) + 1
-                    y = 1j * 2 * np.pi * f * dev.C
-                    Ymnk = np.array([[0, -y.imag],[y.imag, 0]])
+                    y = 1j * 2 * np.pi * f * dev.C + gmin
+                    Ymnk = np.array([[y.real, -y.imag],[y.imag, y.real]])
                     if (dev.n1 > 0):
                         Y[n:n+2,n:n+2] += Ymnk 
                     if (dev.n2 > 0):
@@ -537,8 +556,8 @@ class MultiToneHarmonicBalance:
                 elif isinstance(dev, Inductor):
                     n = (dev.n1 - 1) * self.S + 2 * (k - 1) + 1
                     m = (dev.n2 - 1) * self.S + 2 * (k - 1) + 1
-                    y = 1. / (1j * 2 * np.pi * f * dev.L)
-                    Ymnk = np.array([[0, -y.imag],[y.imag, 0]])
+                    y = 1. / (1j * 2 * np.pi * f * dev.L) + gmin
+                    Ymnk = np.array([[y.real, -y.imag],[y.imag, y.real]])
                     if (dev.n1 > 0):
                         Y[n:n+2,n:n+2] += Ymnk 
                     if (dev.n2 > 0):
@@ -565,17 +584,17 @@ class MultiToneHarmonicBalance:
                         Y[n3:n3+2,n4:n4+2] -= Ymnk
                         Y[n4:n4+2,n3:n3+2] += Ymnk
                 elif isinstance(dev, IdealHarmonicFilter):
-                    if f == dev.freq:
-                        n = (dev.n1 - 1) * self.S + 2 * (k - 1) + 1
-                        m = (dev.n2 - 1) * self.S + 2 * (k - 1) + 1
-                        Ymnk = np.array([[dev.g, 0],[0, dev.g]])
-                        if (dev.n1 > 0):
-                            Y[n:n+2,n:n+2] += Ymnk 
-                        if (dev.n2 > 0):
-                            Y[m:m+2,m:m+2] += Ymnk 
-                        if (dev.n1 > 0 and dev.n2 > 0):
-                            Y[n:n+2,m:m+2] -= Ymnk 
-                            Y[m:m+2,n:n+2] -= Ymnk 
+                    y = dev.g if f == dev.freq else gmin
+                    n = (dev.n1 - 1) * self.S + 2 * (k - 1) + 1
+                    m = (dev.n2 - 1) * self.S + 2 * (k - 1) + 1
+                    Ymnk = np.array([[y, 0],[0, y]])
+                    if (dev.n1 > 0):
+                        Y[n:n+2,n:n+2] += Ymnk 
+                    if (dev.n2 > 0):
+                        Y[m:m+2,m:m+2] += Ymnk 
+                    if (dev.n1 > 0 and dev.n2 > 0):
+                        Y[n:n+2,m:m+2] -= Ymnk 
+                        Y[m:m+2,n:n+2] -= Ymnk 
 
         return Y
 

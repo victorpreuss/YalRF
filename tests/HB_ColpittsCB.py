@@ -38,7 +38,7 @@ Zoscprobe.g = 1e6
 # passives
 y.add_resistor('Rb', 'nb', 'gnd', rb)
 y.add_resistor('Re', 'ne', 'nvee', re)
-y.add_resistor('Rx', 'nvcc', 'nc', re)
+y.add_resistor('Rx', 'nvcc', 'nc', 2e3)
 y.add_inductor('L1', 'nvcc', 'nc', l)
 y.add_capacitor('C1', 'nvcc', 'ne', c1)
 y.add_capacitor('C2', 'ne', 'nc', c2)
@@ -46,8 +46,8 @@ y.add_capacitor('C2', 'ne', 'nc', c2)
 # bjts
 q1 = y.add_bjt('Q1', 'nb', 'nc', 'ne')
 
-q1.options['Is'] = 1e-15
-q1.options['Bf'] = 200
+q1.options['Is'] = 1e-16
+q1.options['Bf'] = 100
 q1.options['Br'] = 1
 
 hb = MultiToneHarmonicBalance('HB1', 1, 10)
@@ -102,7 +102,7 @@ result = optimize.fmin(func     = objFunc,
                        args     = ({'itercnt' : 0},),
                        xtol     = 1e-5,
                        ftol     = 1e-5,
-                       maxfun   = 200,
+                       maxfun   = 150,
                        disp     = True,
                        retall   = False,
                        full_output = True)
@@ -125,9 +125,8 @@ converged, freqs, Vf, time, Vt = hb.run(y, Vprev)
 print('Frequency of oscillation = {} Hz'.format(fosc))
 print('Oscillation amplitude = {} V'.format(Vosc))
 
-# hb.plot_v('nc')
-# hb.plot_v('ne')
-# plt.show()
 hb.print_v('nc')
+hb.plot_v('nc')
+plt.show()
 
 
