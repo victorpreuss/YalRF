@@ -12,7 +12,6 @@ y = Netlist('Oscillator')
 
 # circuit parameters
 vcc = 5
-vin = 0
 c1 = 3.3e-12
 c2 = 3.9e-12
 r1 = 3e3
@@ -20,6 +19,7 @@ r2 = 6.8e3
 re = 1.5e3
 l1 = 10e-9
 
+vin = 0
 freq = 1.2e9
 
 # VCC
@@ -61,11 +61,10 @@ q1 = y.add_bjt('Q1', 'nb', 'nc', 'ne')
 q1.options['Is'] = 1e-15
 q1.options['Bf'] = 100
 q1.options['Br'] = 5
-q1.options['Vaf'] = 20
-q1.options['Var'] = 10
+q1.options['Vaf'] = 60
+q1.options['Var'] = 20
 
 hb = MultiToneHarmonicBalance('HB1', 1, 10)
-# hb = HarmonicBalance('HB1', 1, 7)
 hb.options['maxiter'] = 100
 Vprev = 0
 
@@ -123,16 +122,17 @@ x0 = [ 1.4e9, 1]
 #                             retall   = False,
 #                             full_output = True)
 
+# result = optimize.fmin(func     = objFunc,
+#                        x0       = x0,
+#                        args     = ({'itercnt' : 0},),
+#                        xtol     = 1e-3,
+#                        ftol     = 1e-3,
+#                        maxfun   = 200,
+#                        disp     = True,
+#                        retall   = False,
+#                        full_output = True)
 
-result = optimize.fmin(func     = objFunc,
-                       x0       = x0,
-                       args     = ({'itercnt' : 0},),
-                       xtol     = 1e-5,
-                       ftol     = 1e-5,
-                       maxfun   = 100,
-                       disp     = True,
-                       retall   = False,
-                       full_output = True)
+result = optimize.minimize(fun=objFunc, x0=x0, method='Powell', bounds=b, args=({'itercnt' : 0},))
 
 xopt = result[0]
 
@@ -147,14 +147,13 @@ Zoscprobe.freq = fosc
 
 # run harmonic balance
 hb = MultiToneHarmonicBalance('HB1', fosc, 10)
-# hb = HarmonicBalance('HB1', fosc, 7)
 converged, freqs, Vf, time, Vt = hb.run(y, Vprev)
 
 print('Frequency of oscillation = {} Hz'.format(fosc))
 print('Oscillation amplitude = {} V'.format(Vosc))
 
-# hb.plot_v('nb')
+hb.plot_v('nb')
 # hb.plot_v('nl')
-# plt.show()
+plt.show()
 
 
