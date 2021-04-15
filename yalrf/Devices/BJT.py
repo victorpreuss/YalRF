@@ -491,8 +491,8 @@ class BJT():
         Vbc = Vb - Vc + 1e-6
         Vsc = Vs - Vc + 1e-6
 
-        # Vbe = self.VbeoldHB[s] + 10. * Nf * Vt * np.tanh((Vbe - self.VbeoldHB[s]) / (10. * Nf * Vt)) + 1e-6
-        # Vbc = self.VbcoldHB[s] + 10. * Nr * Vt * np.tanh((Vbc - self.VbcoldHB[s]) / (10. * Nr * Vt)) + 1e-6
+        # Vbe = self.VbeoldHB[s] + 10. * Nf * Vt * np.tanh((Vbe - self.VbeoldHB[s]) / (10. * Nf * Vt))
+        # Vbc = self.VbcoldHB[s] + 10. * Nr * Vt * np.tanh((Vbc - self.VbcoldHB[s]) / (10. * Nr * Vt))
 
         self.VbeoldHB[s] = Vbe
         self.VbcoldHB[s] = Vbc
@@ -521,10 +521,6 @@ class BJT():
 
         It = (If - Ir) / Qb
 
-        Ib = Ibe + Ibc
-        Ic = It - Ibc
-        Ie = Ib + Ic
-
         gbei = Is / (Nf * Vt * Bf) * exp_lim(Vbe / (Nf * Vt))
         gben = Ise / (Ne * Vt) * exp_lim(Vbe / (Ne * Vt))
         gpi  = gbei + gben + gmin
@@ -542,20 +538,18 @@ class BJT():
         gmf = (1. / Qb) * (+ gif - It * dQb_dVbe)
         gmr = (1. / Qb) * (- gir - It * dQb_dVbc)
 
-        if Vbe <= Fc * Vje:
-            Cbedep = Cje * np.power((1. - (Vbe / Vje)), -Mje)
-        else:
-            Cbedep = Cje / np.power((1. - Fc), Mje) * (1. + Mje * (Vbe - Fc * Vje) / (Vje * (1. - Fc)))
+        Cbedep = pn_capacitance(Vbe, Cje, Vje, Mje, Fc)
+        Qbe = pn_charge(Vbe, Cje, Vje, Mje, Fc)
 
-        if Vbc <= Fc * Vjc:
-            Cbcdep = Cjc * np.power((1. - (Vbc / Vjc)), -Mjc)
-        else:
-            Cbcdep = Cjc / np.power((1. - Fc), Mjc) * (1. + Mjc * (Vbc - Fc * Vjc) / (Vjc * (1. - Fc)))
+        Cbcdep = pn_capacitance(Vbc, Cjc, Vjc, Mjc, Fc)
+        Qbc = pn_charge(Vbc, Cjc, Vjc, Mjc, Fc)
 
         if Vsc <= 0:
             Cscdep = Cjs * np.power((1. - (Vsc / Vjs)), -Mjs)
+            Qsc = Cjs * Vjs / (1 - Mjs) * (1 - np.power(1. - Vsc / Vjs, 1. - Mjs))
         else:
             Cscdep = Cjs * (1. + Mjs * Vsc / Vjs)
+            Qsc = Cjs * Vsc / (1 + (Mjs * Vsc) / (2. * Vjs))
 
         Tff = Tf * (1. + Xtf * np.square(If / (If + Itf)) * exp_lim(Vbc / (1.44 * Vtf)))
         dTff_dVbe = Tf * Xtf * 2 * gif * If * Itf * exp_lim(Vbc / (1.44 * Vtf))
@@ -567,14 +561,31 @@ class BJT():
         Cbediff = (1. / Qb) * (If * dTff_dVbe + Tff * (gif - (If / Qb) * dQb_dVbe))
         Cbebc = (If / Qb) * (dTff_dVbc - (Tff / Qb) * dQb_dVbc) + cmin
 
+        # Ibeeq = Ibe - gpi * Vbe
+        # Ibceq = Ibc - gmu * Vbc
+        # Iceeq = It - gmf * Vbe + gmr * Vbc
+
+        # Ib = + Ibeeq + Ibceq
+        # Ic = - Ibceq + Iceeq
+        # Ie = - Ibeeq - Iceeq
+
+        Ib = Ibe + Ibc
+        Ic = It - Ibc
+        Ie = Ib + Ic
+
         if Xcjc != 1.:
             print('WARNING: external base-collector capacitance is currently unsupported')
 
         Cbc = Cbcidep + Cbcdiff + cmin
-        Cbe = Cbedep + Cbediff + cmin
-        Csc = Cscdep + cmin
+        Qbc += Ir * Tr + cmin * Vbc
 
-        return Ib, Ic, Ie, gmu, gpi, gmf, gmr, Cbc, Cbe, Cbebc, Csc
+        Cbe = Cbedep + Cbediff + cmin
+        Qbe += If * Tff / Qb + cmin * Vbe
+
+        Csc = Cscdep + cmin
+        Qsc += cmin * Vsc
+
+        return Ib, Ic, Ie, Qbe, Qbc, Qsc, gmu, gpi, gmf, gmr, Cbc, Cbe, Cbebc, Csc
 
     def __str__(self):
         return 'BJT: {}\nNodes BCE nodes = {}, {}, {}\n'.format(self.name, self.n1, self.n2, self.n3)
@@ -582,6 +593,25 @@ class BJT():
 # limit the maximum derivative of the exponential function
 def exp_lim(x):
     return np.exp(x) if x < 200. else np.exp(200.) + np.exp(200.) * (x - 200.)
+
+def pn_capacitance(Vpn, Cj, Vj, Mj, Fc):
+    if Vpn <= Fc * Vj:
+        C = Cj * np.power((1. - (Vpn / Vj)), -Mj)
+    else:
+        C = Cj / np.power((1. - Fc), Mj) * (1. + Mj * (Vpn - Fc * Vj) / (Vj * (1. - Fc)))
+
+    return C
+
+def pn_charge(Vpn, Cj, Vj, Mj, Fc):
+    if Vpn <= Fc * Vj:
+        Q = Cj * Vj / (1. - Mj) * (1. - np.power((1. - Vpn / Vj), (1. - Mj)))
+    else:
+        X = (1. - np.power((1. - Fc), (1. - Mj))) / (1. - Mj) + \
+            (1. - Fc * (1. + Mj)) / np.power((1. - Fc), (1. + Mj)) * (Vpn / Vj - Fc) + \
+            Mj / (2. * np.power((1. - Fc), (1. + Mj))) * (np.square(Vpn / Vj) - np.square(Fc))
+        Q = Cj * Vj * X
+
+    return Q
 
 """
 
