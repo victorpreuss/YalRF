@@ -7,10 +7,13 @@ import setup
 from yalrf import YalRF, Netlist
 from yalrf.Analyses import HarmonicBalance, MultiToneHarmonicBalance
 
+# initial condition for the oscillator
+x0 = [ 200e6, 5]
+
 y = Netlist('Oscillator')
 
 Cvaractor = 7.5e-12
-osc_node = 'ne'
+osc_node = 'nb'
 
 # VCC
 y.add_idc('I1', 'nx1', 'gnd', dc=12)
@@ -22,7 +25,7 @@ y.add_gyrator('G2', 'nx2', 'nz', 'gnd', 'gnd', 1)
 
 # ideal harmonic filter of oscprobe
 Zoscprobe = y.add_idealharmonicfilter('X1', 'nz', osc_node, 1)
-Zoscprobe.g = 1e7
+Zoscprobe.g = 1e9
 
 # passives
 y.add_resistor('R1', 'nvcc', 'n1', 5.6e3)
@@ -46,35 +49,41 @@ y.add_capacitor('C5', 'ne', 'nload', 47e-12)
 # bjts
 q1 = y.add_bjt('Q1', 'nb', 'nvcc', 'ne')
 
-q1.options['Is'] = 1.4e-14
-q1.options['Nf'] = 1
-q1.options['Nr'] = 1
-q1.options['Ikf'] = 0.025
-q1.options['Ikr'] = 1e9
-q1.options['Vaf'] = 100
-q1.options['Var'] = 1e12
-q1.options['Ise'] = 3e-13
-q1.options['Ne'] = 1.5
-q1.options['Isc'] = 0
-q1.options['Nc'] = 2
-q1.options['Bf'] = 100
-q1.options['Br'] = 7.5
-q1.options['Cje'] = 4.5e-12
-q1.options['Vje'] = 0.75
-q1.options['Mje'] = 0.33
-q1.options['Cjc'] = 3.5e-12
-q1.options['Vjc'] = 0.75
-q1.options['Mjc'] = 0.33
-q1.options['Xcjc'] = 1
-q1.options['Cjs'] = 0
-q1.options['Vjs'] = 0.75
-q1.options['Mjs'] = 0
-q1.options['Fc'] = 0.5
-q1.options['Tf'] = 4e-10
-q1.options['Tr'] = 2.1e-8
+q1.options['Is'] = 1e-16
+q1.options['Bf'] = 200
+q1.options['Br'] = 1
+
+# q1.options['Is'] = 1.4e-14
+# q1.options['Nf'] = 1
+# q1.options['Nr'] = 1
+# q1.options['Ikf'] = 0.025
+# q1.options['Ikr'] = 1e9
+# q1.options['Vaf'] = 100
+# q1.options['Var'] = 1e12
+# q1.options['Ise'] = 3e-13
+# q1.options['Ne'] = 1.5
+# q1.options['Isc'] = 0
+# q1.options['Nc'] = 2
+# q1.options['Bf'] = 100
+# q1.options['Br'] = 7.5
+
+#q1.options['Cje'] = 4.5e-12
+#q1.options['Vje'] = 0.75
+#q1.options['Mje'] = 0.33
+#q1.options['Cjc'] = 3.5e-12
+#q1.options['Vjc'] = 0.75
+#q1.options['Mjc'] = 0.33
+#q1.options['Xcjc'] = 1
+#q1.options['Cjs'] = 0
+#q1.options['Vjs'] = 0.75
+#q1.options['Mjs'] = 0
+#q1.options['Fc'] = 0.5
+#q1.options['Tf'] = 4e-10
+#q1.options['Tr'] = 2.1e-8
 
 hb = MultiToneHarmonicBalance('HB1', 1, 10)
-hb.options['maxiter'] = 100
+hb.options['maxiter'] = 150
+hb.options['abstol'] = 1e-6
 Vprev = 0
 
 def objFunc(x, info):
@@ -88,16 +97,15 @@ def objFunc(x, info):
     Vosc = x[1]
 
     if fosc < 0:
-        return 1e6
+        return 1e2
 
     # update oscprobe values
     Voscprobe.ac = Vosc
     Voscprobe.freq = fosc
     Zoscprobe.freq = fosc
+    hb.freq = fosc
 
     # run harmonic balance
-
-    hb.freq = fosc
     if info['itercnt'] > 0:
         converged, freqs, Vf, time, Vt = hb.run(y, Vprev)
     else:
@@ -125,13 +133,12 @@ def objFunc(x, info):
 
     return abs(Yosc)
 
-x0 = [ 120e6, 0.1]
 result = optimize.fmin(func     = objFunc,
                        x0       = x0,
                        args     = ({'itercnt' : 0},),
                        xtol     = 1e-5,
                        ftol     = 1e-5,
-                       maxfun   = 150,
+                       maxfun   = 200,
                        disp     = True,
                        retall   = False,
                        full_output = True)
@@ -154,11 +161,14 @@ converged, freqs, Vf, time, Vt = hb.run(y, Vprev)
 print('Frequency of oscillation = {} Hz'.format(fosc))
 print('Oscillation amplitude = {} V'.format(Vosc))
 
-# hb.print_v('nload')
+hb.print_v('nload')
 hb.print_v('ne')
+hb.print_v('nb')
+hb.print_v('nvcc')
+
 # hb.print_v('nb')
 # hb.plot_v('nload')
-hb.plot_v('ne')
+# hb.plot_v('ne')
 # hb.plot_v('nb')
 plt.show()
 
