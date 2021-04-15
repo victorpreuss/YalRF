@@ -46,6 +46,7 @@ class MultiToneHarmonicBalance:
 
     def print_v(self, node):
         n = self.get_node_idx(node)
+        print('Voltage at node: ' + node)
         print('Freq [Hz]\tVmag [V]\tPhase [°]')
         for k in range(0, self.K+1):
             v = self.Vf[n,k]
@@ -97,19 +98,21 @@ class MultiToneHarmonicBalance:
                     self.mapfreqs[i] = k * self.l0
                     i += 1
         else:
-            print('ERROR: only one and two-tones are supported')
+            print('ERROR: only one and two-tones are currently supported')
                 
         self.S = 2 * self.K + 1
         self.N = self.netlist.get_num_nodes() - 1
         self.W = self.S * self.N
         
-        print('Freqs = {}'.format(self.freqs))
+        # print('Freqs = {}'.format(self.freqs))
 
         """ Create DFT and IDFT transformation matrices """
 
         self.DFT = np.ones((self.S,self.S))
         for k in range(self.K):
             for s in range(self.S):
+                # self.DFT[2*k+1,s] = np.cos(2*np.pi*(k+1)*s/self.S);
+                # self.DFT[2*k+2,s] = - np.sin(2*np.pi*(k+1)*s/self.S);
                 self.DFT[2*k+1,s] = 2 * np.cos(2*np.pi*(k+1)*s/self.S);
                 self.DFT[2*k+2,s] = 2 * np.sin(2*np.pi*(k+1)*s/self.S);
         self.DFT = self.DFT / self.S;
@@ -117,8 +120,13 @@ class MultiToneHarmonicBalance:
         self.IDFT = np.ones((self.S,self.S))
         for s in range(self.S):
             for k in range(self.K):
+                # self.IDFT[s,2*k+1] = 2 * np.cos(2*np.pi*(k+1)*s/self.S)
+                # self.IDFT[s,2*k+2] = - 2 * np.sin(2*np.pi*(k+1)*s/self.S)
                 self.IDFT[s,2*k+1] = np.cos(2*np.pi*(k+1)*s/self.S)
                 self.IDFT[s,2*k+2] = np.sin(2*np.pi*(k+1)*s/self.S)
+
+        # check if DFT matrices are consistent
+        # print(np.max(self.DFT @ self.IDFT - np.eye(S)))
 
         """ Independent current sources (Is) """
 
@@ -153,8 +161,10 @@ class MultiToneHarmonicBalance:
         # if first attempt fails, try continuation method
         if converged == False:
             Vprev = V.copy()
-            maxiter = 100
+            maxiter = 25
             alpha = 0.01
+            inc = 1.25
+            dec = 1.1
             converged = False
             itercnt = 0
             while (not converged) and (itercnt < maxiter):
@@ -177,14 +187,17 @@ class MultiToneHarmonicBalance:
                         break
 
                     Vprev = V.copy()
-                    alpha = 1.25 * alpha
+                    alpha = inc * alpha
                     if alpha >= 1.0:
                         alpha = 1.0
 
                 else:
                     V = Vprev.copy()
                     vt = self.ifft(V)
-                    alpha = alpha / 1.1
+                    if alpha >= 1.0:
+                        dec = 1 + 1.5 * (dec - 1)
+                        inc = 1 + (inc - 1) / 1.5
+                    alpha = alpha / dec
                     if alpha <= 0.001:
                         converged = False
                         break
@@ -216,6 +229,7 @@ class MultiToneHarmonicBalance:
 
         vt = self.ifft(V)
         it = np.zeros((self.W,1))
+        qt = np.zeros((self.W,1))
         dIdV = np.zeros((self.W,self.W))
         dQdV = np.zeros((self.W,self.W))
         Omega = np.zeros((self.W,self.W))
@@ -224,8 +238,7 @@ class MultiToneHarmonicBalance:
             for k in range(1,self.K+1):
                 i = n * self.S + 2 * (k - 1) + 1
                 omega = 2 * np.pi * self.freqs[k]
-                y = np.array([[0, omega],[omega, 0]])
-                # y = np.array([[omega, 0],[0, omega]])
+                y = np.array([[0, -omega],[omega, 0]])
                 Omega[i:i+2,i:i+2] = y
 
         # initialize variables for PN junction limiting
@@ -257,6 +270,7 @@ class MultiToneHarmonicBalance:
             # run a time-varying oppoint analysis on the nonlinear devices
             dIdV[:,:] = 0
             it[:] = 0
+            qt[:] = 0
             for dev in self.nonlin_devs:
                 if isinstance(dev, Diode):
                     n1 = dev.n1 - 1
@@ -298,6 +312,10 @@ class MultiToneHarmonicBalance:
                     Ic = np.zeros((self.S,1))
                     Ie = np.zeros((self.S,1))
 
+                    Qbe = np.zeros((self.S,1))
+                    Qbc = np.zeros((self.S,1))
+                    Qsc = np.zeros((self.S,1))
+
                     gmu = np.zeros((self.S))
                     gpi = np.zeros((self.S))
                     gmf = np.zeros((self.S))
@@ -314,7 +332,7 @@ class MultiToneHarmonicBalance:
                         Ve = vt[E*self.S+s] if E >= 0 else 0
                         Vs = 0
 
-                        Ib[s], Ic[s], Ie[s], gmu[s], gpi[s], gmf[s], gmr[s], Cbc[s], Cbe[s], Cbebc[s], Csc[s] = dev.get_hb_params(Vb, Vc, Ve, Vs, s)
+                        Ib[s], Ic[s], Ie[s], Qbe[s], Qbc[s], Qsc[s], gmu[s], gpi[s], gmf[s], gmr[s], Cbc[s], Cbe[s], Cbebc[s], Csc[s] = dev.get_hb_params(Vb, Vc, Ve, Vs, s)
 
                     gmuf = self.DFT @ np.diag(gmu) @ self.IDFT
                     gpif = self.DFT @ np.diag(gpi) @ self.IDFT
@@ -324,7 +342,7 @@ class MultiToneHarmonicBalance:
                     Cbef = self.DFT @ np.diag(Cbe) @ self.IDFT
                     Cbcf = self.DFT @ np.diag(Cbc) @ self.IDFT
                     Cbebcf = self.DFT @ np.diag(Cbebc) @ self.IDFT
-                    Cscf = self.DFT @ np.diag(Csc) @ self.IDFT
+                    # Cscf = self.DFT @ np.diag(Csc) @ self.IDFT
 
                     if B >= 0:
                         i = B * self.S
@@ -332,6 +350,7 @@ class MultiToneHarmonicBalance:
                         dIdV[i:j,i:j] += (gmuf + gpif)
                         dQdV[i:j,i:j] += (Cbcf + Cbef + Cbebcf)
                         it[i:j] += Ib
+                        qt[i:j] += (Qbe + Qbc)
 
                         if C >= 0:
                             x = C * self.S
@@ -353,8 +372,9 @@ class MultiToneHarmonicBalance:
                         i = C * self.S
                         j = i + self.S
                         dIdV[i:j,i:j] += (+ gmuf - gmrf)
-                        dQdV[i:j,i:j] += (+ Cbcf + Cscf)
+                        dQdV[i:j,i:j] += (+ Cbcf )#+ Cscf)
                         it[i:j] += Ic
+                        qt[i:j] -= Qbc # - Qsc
 
                         if E >= 0:
                             x = E * self.S
@@ -370,10 +390,11 @@ class MultiToneHarmonicBalance:
                         dIdV[i:j,i:j] += (+ gpif + gmff)
                         dQdV[i:j,i:j] += (+ Cbef)
                         it[i:j] -= Ie
+                        qt[i:j] -= Qbe
 
             """ Calculating the Jacobian Matrix J(jw) """
 
-            J = Y + dIdV + Omega * dQdV
+            J = Y + dIdV + Omega @ dQdV
 
             # print('J = {}'.format(J))
 
@@ -383,11 +404,11 @@ class MultiToneHarmonicBalance:
 
             """ Nonlinear current Inl(jw) """
 
-            Inl = self.fft(it)
+            Inl = self.fft(it) + Omega @ self.fft(qt)
 
             """ Calculate error function F(jw) """
 
-            F = Il + Inl # + j * Omega * Q
+            F = Il + Inl
 
             # print('F = {}'.format(F))
 
@@ -409,7 +430,12 @@ class MultiToneHarmonicBalance:
                 dV = lu.solve(F)
             else:
                 lu, piv = scipy.linalg.lu_factor(J)
-                dV = scipy.linalg.lu_solve((lu, piv), F)
+                aaa = scipy.linalg.lu_solve((lu, piv), F)
+
+            if any(np.isnan(x) for x in aaa.flatten()):
+               pass
+            else:
+                dV = aaa
 
             V = V - dV
 
@@ -471,7 +497,7 @@ class MultiToneHarmonicBalance:
     def calc_Y(self):
         Y = np.zeros((self.W, self.W))
         gmin = 1e-12
-        gmax = 1e7
+        gmax = 1e9
         for dev in self.lin_devs:
 
             # add DC stamps for linear devices
