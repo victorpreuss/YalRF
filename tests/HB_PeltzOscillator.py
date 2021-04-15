@@ -46,7 +46,7 @@ q1.options['Bf'] = 200
 q1.options['Br'] = 1
 q2.options = q1.options.copy()
 
-hb = MultiToneHarmonicBalance('HB1', 1, 10)
+hb = MultiToneHarmonicBalance('HB1', 1, 7)
 hb.options['maxiter'] = 100
 Vprev = 0
 
@@ -92,14 +92,13 @@ def objFunc(x, info):
 
     return abs(Yosc)
 
-b  = [(1.1e9, 1.3e9), (2, 3)]
 x0 = [ 100e3, 0.5]
 result = optimize.fmin(func     = objFunc,
                        x0       = x0,
                        args     = ({'itercnt' : 0},),
-                       xtol     = 1e-5,
-                       ftol     = 1e-5,
-                       maxfun   = 100,
+                       xtol     = 1e-3,
+                       ftol     = 1e-3,
+                       maxfun   = 200,
                        disp     = True,
                        retall   = False,
                        full_output = True)
@@ -116,7 +115,7 @@ Voscprobe.freq = fosc
 Zoscprobe.freq = fosc
 
 # run harmonic balance
-hb = MultiToneHarmonicBalance('HB1', fosc, 10)
+hb = MultiToneHarmonicBalance('HB1', fosc, 7)
 converged, freqs, Vf, time, Vt = hb.run(y, Vprev)
 
 print('Frequency of oscillation = {} Hz'.format(fosc))
