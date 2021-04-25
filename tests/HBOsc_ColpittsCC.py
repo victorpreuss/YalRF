@@ -17,7 +17,7 @@ c2 = 3.9e-12
 r1 = 3e3
 r2 = 6.8e3
 re = 1.5e3
-l1 = 10e-9
+l1 = 6.944e-9
 
 vin = 0
 freq = 1.2e9
@@ -64,7 +64,7 @@ q1.options['Br'] = 5
 q1.options['Vaf'] = 60
 q1.options['Var'] = 20
 
-hb = MultiToneHarmonicBalance('HB1', 1, 10)
+hb = MultiToneHarmonicBalance('HB1', 1, 30)
 hb.options['maxiter'] = 100
 Vprev = 0
 
@@ -93,7 +93,7 @@ def objFunc(x, info):
 
     # if HB failed to converge, return a bad convergence value to minimizer
     if not converged:
-        return 1e6
+        return 1e2
 
     # get nodes of IdealHarmonicFilter
     n1 = hb.get_node_idx('nind')
@@ -110,7 +110,6 @@ def objFunc(x, info):
 
     return abs(Yosc)
 
-b  = [(1.1e9, 1.3e9), (2, 3)]
 x0 = [ 1.4e9, 1]
 # result = optimize.fmin_bfgs(f        = objFunc,
 #                             x0       = x0,
@@ -122,17 +121,18 @@ x0 = [ 1.4e9, 1]
 #                             retall   = False,
 #                             full_output = True)
 
-# result = optimize.fmin(func     = objFunc,
-#                        x0       = x0,
-#                        args     = ({'itercnt' : 0},),
-#                        xtol     = 1e-3,
-#                        ftol     = 1e-3,
-#                        maxfun   = 200,
-#                        disp     = True,
-#                        retall   = False,
-#                        full_output = True)
+result = optimize.fmin(func     = objFunc,
+                       x0       = x0,
+                       args     = ({'itercnt' : 0},),
+                       xtol     = 1e-3,
+                       ftol     = 1e-3,
+                       maxfun   = 200,
+                       disp     = True,
+                       retall   = False,
+                       full_output = True)
 
-result = optimize.minimize(fun=objFunc, x0=x0, method='Powell', bounds=b, args=({'itercnt' : 0},))
+# b  = [(1.1e9, 1.3e9), (2, 3)]
+# result = optimize.minimize(fun=objFunc, x0=x0, method='Powell', bounds=b, args=({'itercnt' : 0},))
 
 xopt = result[0]
 
@@ -146,14 +146,14 @@ Voscprobe.freq = fosc
 Zoscprobe.freq = fosc
 
 # run harmonic balance
-hb = MultiToneHarmonicBalance('HB1', fosc, 10)
+hb = MultiToneHarmonicBalance('HB1', fosc, 30)
 converged, freqs, Vf, time, Vt = hb.run(y, Vprev)
 
 print('Frequency of oscillation = {} Hz'.format(fosc))
 print('Oscillation amplitude = {} V'.format(Vosc))
 
-hb.plot_v('nb')
-# hb.plot_v('nl')
+hb.plot_v('nind')
+hb.plot_v('nl')
 plt.show()
 
 

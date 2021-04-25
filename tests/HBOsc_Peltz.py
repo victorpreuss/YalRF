@@ -46,7 +46,7 @@ q1.options['Bf'] = 200
 q1.options['Br'] = 1
 q2.options = q1.options.copy()
 
-hb = MultiToneHarmonicBalance('HB1', 1, 7)
+hb = MultiToneHarmonicBalance('HB1', 1, 10)
 hb.options['maxiter'] = 100
 Vprev = 0
 
@@ -75,7 +75,7 @@ def objFunc(x, info):
 
     # if HB failed to converge, return a bad convergence value to minimizer
     if not converged:
-        return 1e6
+        return 1e2
 
     # get nodes of IdealHarmonicFilter
     n1 = hb.get_node_idx('nb')
@@ -115,7 +115,7 @@ Voscprobe.freq = fosc
 Zoscprobe.freq = fosc
 
 # run harmonic balance
-hb = MultiToneHarmonicBalance('HB1', fosc, 7)
+hb = MultiToneHarmonicBalance('HB1', fosc, 10)
 converged, freqs, Vf, time, Vt = hb.run(y, Vprev)
 
 print('Frequency of oscillation = {} Hz'.format(fosc))

@@ -7,9 +7,6 @@ import setup
 from yalrf import YalRF, Netlist
 from yalrf.Analyses import HarmonicBalance, MultiToneHarmonicBalance
 
-# initial condition for the oscillator
-x0 = [ 200e6, 5]
-
 y = Netlist('Oscillator')
 
 Cvaractor = 7.5e-12
@@ -49,39 +46,39 @@ y.add_capacitor('C5', 'ne', 'nload', 47e-12)
 # bjts
 q1 = y.add_bjt('Q1', 'nb', 'nvcc', 'ne')
 
-q1.options['Is'] = 1e-16
-q1.options['Bf'] = 200
-q1.options['Br'] = 1
+# q1.options['Is'] = 1e-16
+# q1.options['Bf'] = 200
+# q1.options['Br'] = 1
 
-# q1.options['Is'] = 1.4e-14
-# q1.options['Nf'] = 1
-# q1.options['Nr'] = 1
-# q1.options['Ikf'] = 0.025
-# q1.options['Ikr'] = 1e9
-# q1.options['Vaf'] = 100
-# q1.options['Var'] = 1e12
-# q1.options['Ise'] = 3e-13
-# q1.options['Ne'] = 1.5
-# q1.options['Isc'] = 0
-# q1.options['Nc'] = 2
-# q1.options['Bf'] = 100
-# q1.options['Br'] = 7.5
+q1.options['Is'] = 1.4e-14
+q1.options['Nf'] = 1
+q1.options['Nr'] = 1
+q1.options['Ikf'] = 0.025
+q1.options['Ikr'] = 1e9
+q1.options['Vaf'] = 100
+q1.options['Var'] = 1e12
+q1.options['Ise'] = 3e-13
+q1.options['Ne'] = 1.5
+q1.options['Isc'] = 0
+q1.options['Nc'] = 2
+q1.options['Bf'] = 100
+q1.options['Br'] = 7.5
 
-#q1.options['Cje'] = 4.5e-12
-#q1.options['Vje'] = 0.75
-#q1.options['Mje'] = 0.33
-#q1.options['Cjc'] = 3.5e-12
-#q1.options['Vjc'] = 0.75
-#q1.options['Mjc'] = 0.33
-#q1.options['Xcjc'] = 1
-#q1.options['Cjs'] = 0
-#q1.options['Vjs'] = 0.75
-#q1.options['Mjs'] = 0
-#q1.options['Fc'] = 0.5
-#q1.options['Tf'] = 4e-10
-#q1.options['Tr'] = 2.1e-8
+q1.options['Cje'] = 4.5e-12
+q1.options['Vje'] = 0.75
+q1.options['Mje'] = 0.33
+q1.options['Cjc'] = 3.5e-12
+q1.options['Vjc'] = 0.75
+q1.options['Mjc'] = 0.33
+q1.options['Xcjc'] = 1
+q1.options['Cjs'] = 0
+q1.options['Vjs'] = 0.75
+q1.options['Mjs'] = 0
+q1.options['Fc'] = 0.5
+q1.options['Tf'] = 4e-10
+q1.options['Tr'] = 2.1e-8
 
-hb = MultiToneHarmonicBalance('HB1', 1, 10)
+hb = MultiToneHarmonicBalance('HB1', 1, 7)
 hb.options['maxiter'] = 150
 hb.options['abstol'] = 1e-6
 Vprev = 0
@@ -114,9 +111,7 @@ def objFunc(x, info):
 
     # if HB failed to converge, return a bad convergence value to minimizer
     if not converged:
-        return 1e6
-
-    # hb.print_v('ne')
+        return 1e2
 
     # get nodes of IdealHarmonicFilter
     n1 = hb.get_node_idx(osc_node)
@@ -133,11 +128,14 @@ def objFunc(x, info):
 
     return abs(Yosc)
 
+# initial condition for the oscillator
+x0 = [ 115e6, 1]
+
 result = optimize.fmin(func     = objFunc,
                        x0       = x0,
                        args     = ({'itercnt' : 0},),
-                       xtol     = 1e-5,
-                       ftol     = 1e-5,
+                       xtol     = 1e-3,
+                       ftol     = 1e-3,
                        maxfun   = 200,
                        disp     = True,
                        retall   = False,

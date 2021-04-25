@@ -12,8 +12,8 @@ y = Netlist('Oscillator')
 # circuit parameters
 vcc = 3
 vee = -3
-rb = 10
-re = 5e3
+rb = 100
+re = 2.2e3
 l = 5e-6
 c1 = 200e-12
 c2 = 50e-12
@@ -38,7 +38,7 @@ Zoscprobe.g = 1e9
 # passives
 #y.add_resistor('Rb', 'nb', 'gnd', rb)
 y.add_resistor('Re', 'ne', 'nvee', re)
-y.add_resistor('Rx', 'nvccx', 'nvcc', 0.5)
+y.add_resistor('Rx', 'nvccx', 'nvcc', 10)
 y.add_inductor('L1', 'nvccx', 'nc', l)
 y.add_capacitor('C1', 'ne', 'nc', c1)
 y.add_capacitor('C2', 'nvcc', 'ne', c2)
@@ -72,7 +72,7 @@ q1.options['Tf'] = 427e-12
 q1.options['Tr'] = 50.3e-9
 
 hb = MultiToneHarmonicBalance('HB1', 1, 10)
-hb.options['maxiter'] = 150
+hb.options['maxiter'] = 100
 Vprev = 0
 
 def objFunc(x, info):
@@ -112,13 +112,12 @@ def objFunc(x, info):
     Yosc  = Iosc / Voscx
 
     info['itercnt'] += 1
-    print('\nIter\tFreq [kHz]\tVosc [V]\tmag(Yosc)')
-    print('{}\t{:.8f}\t{:.8f}\t{:.2e}\n'.format(info['itercnt'], fosc / 1e3, Vosc, abs(Yosc)))
+    print('\nIter\tFreq [MHz]\tVosc [V]\tmag(Yosc)')
+    print('{}\t{:.8f}\t{:.8f}\t{:.2e}\n'.format(info['itercnt'], fosc / 1e6, Vosc, abs(Yosc)))
 
     return abs(Yosc)
 
-b  = [(5e6, 15e6), (1, 4)]
-x0 = [ 10e6, 1]
+x0 = [ 7e6, 1]
 result = optimize.fmin(func     = objFunc,
                        x0       = x0,
                        args     = ({'itercnt' : 0},),
@@ -129,7 +128,8 @@ result = optimize.fmin(func     = objFunc,
                        retall   = False,
                        full_output = True)
 
-#result = optimize.minimize(fun=objFunc, x0=x0, method='Powell', bounds=b, args=({'itercnt' : 0},))
+# b  = [(5e6, 15e6), (1, 4)]
+# result = optimize.minimize(fun=objFunc, x0=x0, method='Powell', bounds=b, args=({'itercnt' : 0},))
 
 xopt = result[0]
 

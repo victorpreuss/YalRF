@@ -561,14 +561,6 @@ class BJT():
         Cbediff = (1. / Qb) * (If * dTff_dVbe + Tff * (gif - (If / Qb) * dQb_dVbe))
         Cbebc = (If / Qb) * (dTff_dVbc - (Tff / Qb) * dQb_dVbc) + cmin
 
-        # Ibeeq = Ibe - gpi * Vbe
-        # Ibceq = Ibc - gmu * Vbc
-        # Iceeq = It - gmf * Vbe + gmr * Vbc
-
-        # Ib = + Ibeeq + Ibceq
-        # Ic = - Ibceq + Iceeq
-        # Ie = - Ibeeq - Iceeq
-
         Ib = Ibe + Ibc
         Ic = It - Ibc
         Ie = Ib + Ic
