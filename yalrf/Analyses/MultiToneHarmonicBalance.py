@@ -33,16 +33,80 @@ class MultiToneHarmonicBalance:
 
     def plot_v(self, node):
         n = self.get_node_idx(node)
-        plt.figure(figsize=(10,6))
+
+        if self.freqs[1] > 1e9:
+            funit = 'GHz'
+            c = 1e9
+        elif self.freqs[1] > 1e6:
+            funit = 'MHz'
+            c = 1e6
+        elif self.freqs[1] > 1e3:
+            funit = 'kHz'
+            c = 1e3
+        else:
+            funit = 'Hz'
+            c = 1
+
+        plt.rc('axes', titlesize=14)    # fontsize of the axes title
+        plt.rc('axes', labelsize=12)    # fontsize of the x and y labels
+
+        if self.num_tones == 1:
+            plt.figure(figsize=(14,5))
+            plt.subplot(121)
+        else:
+            plt.figure(figsize=(10,6))
+
+        # plt.rc('font', size=SMALL_SIZE)          # controls default text sizes
+        # plt.rc('xtick', labelsize=SMALL_SIZE)    # fontsize of the tick labels
+        # plt.rc('ytick', labelsize=SMALL_SIZE)    # fontsize of the tick labels
+        # plt.rc('legend', fontsize=SMALL_SIZE)    # legend fontsize
+        # plt.rc('figure', titlesize=BIGGER_SIZE)  # fontsize of the figure title
+
         plt.title('Frequency-domain $V(j \omega)$')
-        plt.stem(self.freqs, np.abs(self.Vf[n]), use_line_collection=True, markerfmt='^')
+        plt.stem(self.freqs / c, np.abs(self.Vf[n]), use_line_collection=True, markerfmt='r^', linefmt='r')
         for f, v in zip(self.freqs, self.Vf[n]):
             label = r'{:.3f} $\angle$ {:.1f}$^\circ$'.format(np.abs(v), np.degrees(np.angle(v)))
-            plt.annotate(label, (f, np.abs(v)), textcoords="offset points", xytext=(0,5), ha='left', va='bottom', rotation=45)
-        plt.xlabel('frequency [Hz]')
-        plt.ylabel('magnitude [V]')
+            if f <= 3 * self.freqs[1]:
+                plt.annotate(label, (f / c, np.abs(v)), textcoords="offset points", xytext=(0,5), ha='left', va='bottom', rotation=30)
+        plt.xlabel('frequency [' + funit + ']')
+        plt.ylabel('V(\'' + node + '\') [V]')
         plt.grid()
         plt.tight_layout()
+
+        # if single-tone analysis, also plot time-domain waveform
+        if self.num_tones == 1:
+            S = 32 * self.K # increase number of time samples
+            time = 2 / self.freq / S * np.linspace(0, S, S)
+            Vt = np.zeros(S)
+            for s in range(S):
+                Vt[s] = self.Vf[n,0].real
+                for k in range(1, self.K+1):
+                    Vt[s] = Vt[s] + self.Vf[n,k].real * np.cos(2. * np.pi * k * s / (S / 2)) - \
+                                    self.Vf[n,k].imag * np.sin(2. * np.pi * k * s / (S / 2))
+
+            if time[-1] > 1:
+                tunit = 's'
+                c = 1
+            elif time[-1] > 1e-3:
+                tunit = 'ms'
+                c = 1e3
+            elif time[-1] > 1e-6:
+                tunit = '$\mu$s'
+                c = 1e6
+            elif time[-1] > 1e-9:
+                tunit = 'ns'
+                c = 1e9
+            else: # time[-1] > 1e-12
+                tunit = 'ps'
+                c = 1e12
+
+            plt.subplot(122)
+            plt.title('Time-domain $V(t)$')
+            plt.plot(time * c, Vt)
+            plt.xlabel('time [' + tunit + ']')
+            plt.ylabel('V(\'' + node + '\') [V]')
+            plt.grid()
+            plt.tight_layout()
 
     def print_v(self, node):
         n = self.get_node_idx(node)
@@ -161,7 +225,7 @@ class MultiToneHarmonicBalance:
         # if first attempt fails, try continuation method
         if converged == False:
             Vprev = V.copy()
-            maxiter = 25
+            maxiter = 50
             alpha = 0.01
             inc = 1.25
             dec = 1.1
@@ -223,7 +287,6 @@ class MultiToneHarmonicBalance:
                 self.Vf[n,k] = An * np.exp(1j * phi)
 
         return converged, self.freqs, self.Vf, None, None
-        # return converged, self.freqs, self.Vf, self.time, self.Vt
 
     def hb_loop(self, Is, Y, V):
 
@@ -342,7 +405,7 @@ class MultiToneHarmonicBalance:
                     Cbef = self.DFT @ np.diag(Cbe) @ self.IDFT
                     Cbcf = self.DFT @ np.diag(Cbc) @ self.IDFT
                     Cbebcf = self.DFT @ np.diag(Cbebc) @ self.IDFT
-                    # Cscf = self.DFT @ np.diag(Csc) @ self.IDFT
+                    Cscf = self.DFT @ np.diag(Csc) @ self.IDFT
 
                     if B >= 0:
                         i = B * self.S
@@ -372,9 +435,9 @@ class MultiToneHarmonicBalance:
                         i = C * self.S
                         j = i + self.S
                         dIdV[i:j,i:j] += (+ gmuf - gmrf)
-                        dQdV[i:j,i:j] += (+ Cbcf )#+ Cscf)
+                        dQdV[i:j,i:j] += (+ Cbcf + Cscf)
                         it[i:j] += Ic
-                        qt[i:j] -= Qbc # - Qsc
+                        qt[i:j] -= Qbc - Qsc
 
                         if E >= 0:
                             x = E * self.S
@@ -430,12 +493,12 @@ class MultiToneHarmonicBalance:
                 dV = lu.solve(F)
             else:
                 lu, piv = scipy.linalg.lu_factor(J)
-                aaa = scipy.linalg.lu_solve((lu, piv), F)
+                dVnew = scipy.linalg.lu_solve((lu, piv), F)
 
-            if any(np.isnan(x) for x in aaa.flatten()):
+            if any(np.isnan(x) for x in dVnew.flatten()):
                pass
             else:
-                dV = aaa
+                dV = dVnew
 
             V = V - dV
 
