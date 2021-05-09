@@ -599,7 +599,7 @@ class Netlist():
         self.devices.append(diode)
         return diode
 
-    def add_bjt(self, name, n1, n2, n3, n4='gnd'):
+    def add_bjt(self, name, n1, n2, n3, n4='gnd', ispnp=False):
         """
         Add a BJT to the netlist.
 
@@ -620,6 +620,8 @@ class Netlist():
             Emitter(E).
         n4: str
             Substrate (S).
+        ispnp: bool
+            Set BJT type as PNP.
 
         Returns
         -------
@@ -638,7 +640,7 @@ class Netlist():
         n3 = self.add_node(n3)
         n4 = self.add_node(n4)
         
-        bjt = BJT(name, n1, n2, n3)
+        bjt = BJT(name, n1, n2, n3, n4, ispnp)
         self.devices.append(bjt)
         return bjt
 
