@@ -72,7 +72,7 @@ class AC():
         for dev in self.devs:
             dev.init()
             if dev.is_nonlinear():
-                dev.calc_oppoint(self.xdc)
+                dev.calc_oppoint(self.xdc, False)
                 dev.save_oppoint()
 
         # Here we go!
