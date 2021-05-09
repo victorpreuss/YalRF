@@ -25,16 +25,16 @@ class Inductor():
         z[iidx] = 0.0
 
     def add_ac_stamps(self, A, z, x, iidx, freq):
-        y = 1.0 / (1j * 2 * np.pi * freq * self.L) if freq != 0. else 1e9
-        A[self.n1][self.n1] += y
-        A[self.n2][self.n2] += y
-        A[self.n1][self.n2] -= y
-        A[self.n2][self.n1] -= y
-        # A[self.n1][iidx] = +1.0
-        # A[self.n2][iidx] = -1.0
-        # A[iidx][self.n1] = +y
-        # A[iidx][self.n2] = -y
-        # A[iidx][iidx] = -1.0
+        y = 1.0 / (1j * 2 * np.pi * freq * self.L) # if freq != 0. else 1e9
+        # A[self.n1][self.n1] += y
+        # A[self.n2][self.n2] += y
+        # A[self.n1][self.n2] -= y
+        # A[self.n2][self.n1] -= y
+        A[self.n1][iidx] = +1.0
+        A[self.n2][iidx] = -1.0
+        A[iidx][self.n1] = +y
+        A[iidx][self.n2] = -y
+        A[iidx][iidx] = -1.0
 
     def add_tran_stamps(self, A, z, x, iidx, xt, t, tstep):
         # get inductor voltage and current
