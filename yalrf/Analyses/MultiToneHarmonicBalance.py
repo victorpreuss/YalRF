@@ -226,8 +226,8 @@ class MultiToneHarmonicBalance:
         if converged == False:
             Vprev = V.copy()
             maxiter = 50
-            alpha = 0.01
-            inc = 1.25
+            alpha = 0.1
+            inc = 1.3
             dec = 1.1
             converged = False
             itercnt = 0
@@ -486,15 +486,28 @@ class MultiToneHarmonicBalance:
 
             """ Calculate next voltage guess using NR """
 
+            # matrix pruning and calc of its density factor
+            # TODO: need to reimplement the pruning algorithm so that it doesnt
+            # create cases of singular jacobians. currently the density factor
+            # will always choose the non sparse method
+            # J[J < 1e-15] = 0.
+            # for i in range(0, self.W):
+            #     for j in range(0, self.W):
+            #         if i != j and J[i,j] < 1e-15:
+            #             J[i,j] = 0.
+            density = np.count_nonzero(J==0) / np.prod(J.shape)
+
             # currently just using standard LU factorization
-            if False:
+            if density > 1:
                 Jn = scipy.sparse.csc_matrix(J)
                 lu = scipy.sparse.linalg.splu(Jn)
-                dV = lu.solve(F)
+                dVnew = lu.solve(F)
             else:
                 lu, piv = scipy.linalg.lu_factor(J)
                 dVnew = scipy.linalg.lu_solve((lu, piv), F)
+            # dVnew = scipy.linalg.pinv(J) @ F
 
+            # any element in dV is nan, do not update reuse last decrement
             if any(np.isnan(x) for x in dVnew.flatten()):
                pass
             else:
