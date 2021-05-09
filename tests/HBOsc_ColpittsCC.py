@@ -64,14 +64,17 @@ q1.options['Br'] = 5
 q1.options['Vaf'] = 60
 q1.options['Var'] = 20
 
-hb = MultiToneHarmonicBalance('HB1', 1, 30)
+hb = MultiToneHarmonicBalance('HB1', 1, 100)
 hb.options['maxiter'] = 100
-Vprev = 0
+
+global result
+global Vprev
 
 def objFunc(x, info):
 
     global hb
     global Vprev
+    global result
 
     # get new solution candidates
     fosc = x[0]
@@ -108,9 +111,16 @@ def objFunc(x, info):
     print('\nIter\tFreq [GHz]\tVosc [V]\tmag(Yosc)')
     print('{}\t{:.8f}\t{:.8f}\t{:.2e}\n'.format(info['itercnt'], fosc / 1e9, Vosc, abs(Yosc)))
 
+    if abs(Yosc) < 1e-12:
+        result = x
+        print("Optimization terminated succesfully! |Y| < 1e-12")
+        raise SmallEnoughException()
+
     return abs(Yosc)
 
-x0 = [ 1.4e9, 1]
+class SmallEnoughException(Exception):
+    pass
+
 # result = optimize.fmin_bfgs(f        = objFunc,
 #                             x0       = x0,
 #                             args     = ({'itercnt' : 0},),
@@ -119,24 +129,27 @@ x0 = [ 1.4e9, 1]
 #                             maxiter  = 10,
 #                             disp     = True,
 #                             retall   = False,
-#                             full_output = True)
-
-result = optimize.fmin(func     = objFunc,
-                       x0       = x0,
-                       args     = ({'itercnt' : 0},),
-                       xtol     = 1e-3,
-                       ftol     = 1e-3,
-                       maxfun   = 200,
-                       disp     = True,
-                       retall   = False,
-                       full_output = True)
+#                             full_output = True)[0]
 
 # b  = [(1.1e9, 1.3e9), (2, 3)]
-# result = optimize.minimize(fun=objFunc, x0=x0, method='Powell', bounds=b, args=({'itercnt' : 0},))
+# result = optimize.minimize(fun=objFunc, x0=x0, method='Powell', bounds=b, args=({'itercnt' : 0},))[0]
 
-xopt = result[0]
+x0 = [ 1.2e9, 1]
+try:
+    xopt = optimize.fmin(func     = objFunc,
+                         x0       = x0,
+                         args     = ({'itercnt' : 0},),
+                         xtol     = 1e-3,
+                         ftol     = 1e-3,
+                         maxfun   = 200,
+                         disp     = True,
+                         retall   = False,
+                         full_output = True)[0]
+except SmallEnoughException:
+    xopt = result
 
-# get solution and unnormalize it
+
+# get solution
 fosc = xopt[0]
 Vosc = xopt[1]
 
@@ -146,14 +159,14 @@ Voscprobe.freq = fosc
 Zoscprobe.freq = fosc
 
 # run harmonic balance
-hb = MultiToneHarmonicBalance('HB1', fosc, 30)
+hb = MultiToneHarmonicBalance('HB1', fosc, 100)
 converged, freqs, Vf, time, Vt = hb.run(y, Vprev)
 
 print('Frequency of oscillation = {} Hz'.format(fosc))
 print('Oscillation amplitude = {} V'.format(Vosc))
 
-hb.plot_v('nind')
-hb.plot_v('nl')
+# hb.plot_v('nind')
+# hb.plot_v('nl')
 plt.show()
 
 

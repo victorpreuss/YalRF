@@ -49,8 +49,8 @@ y.add_resistor('R3', 'n2', 'gnd', r3)
 # bjt
 q1 = y.add_bjt('Q1', 'nb', 'nc', 'ne')
 
-q1.options['Is'] = 10.3e-15
-q1.options['Bf'] = 1090
+q1.options['Is'] = 10.2e-15
+q1.options['Bf'] = 301
 q1.options['Br'] = 4
 q1.options['Ne'] = 2
 q1.options['Nc'] = 2
@@ -63,7 +63,7 @@ q1.options['Ikr'] = 0.15
 q1.options['Cje'] = 26.8e-12
 q1.options['Vje'] = 1.1
 q1.options['Mje'] = 0.5
-q1.options['Cjc'] = 0 # 8.67e-12
+q1.options['Cjc'] = 8.67e-12
 q1.options['Vjc'] = 0.3
 q1.options['Mjc'] = 0.3
 q1.options['Xcjc'] = 1
@@ -71,8 +71,8 @@ q1.options['Cjs'] = 0
 q1.options['Vjs'] = 0.75
 q1.options['Mjs'] = 0
 q1.options['Fc'] = 0.5
-q1.options['Tf'] = 0 # 427e-12
-q1.options['Tr'] = 0 # 50.3e-9
+q1.options['Tf'] = 427e-12
+q1.options['Tr'] = 50.3e-9
 
 hb = MultiToneHarmonicBalance('HB1', freq, 10)
 hb.options['maxiter'] = 100
