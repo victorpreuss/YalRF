@@ -57,14 +57,18 @@ options['Area'] = 1.0   # bjt area multiplier
 #       temperature dependence
 #       Cbcxdep is currently unused
 #       noise
+#       finish implementing pnp support (HB)
+#       improve usage of substrate terminal
 class BJT():
     
-    def __init__(self, name, n1, n2, n3, n4=0):
+    def __init__(self, name, n1, n2, n3, n4=0, ispnp=False):
         self.name = name
         self.n1   = n1 # base (B)
         self.n2   = n2 # collector (C)
         self.n3   = n3 # emitter (E)
         self.n4   = n4 # substrate (S)
+
+        self.type = -1 if ispnp else 1
 
         self.options = options.copy() # bjt options
         self.oppoint = {}
@@ -158,9 +162,9 @@ class BJT():
         A[E][B] = A[E][B] - gpi - gmf - gmr
         A[E][C] = A[E][C] + gmr
         A[E][E] = A[E][E] + gpi + gmf
-        z[B] = z[B] - Ibeeq - Ibceq
-        z[C] = z[C] + Ibceq - Iceeq
-        z[E] = z[E] + Ibeeq + Iceeq
+        z[B] = z[B] + (- Ibeeq - Ibceq) * self.type
+        z[C] = z[C] + (+ Ibceq - Iceeq) * self.type
+        z[E] = z[E] + (+ Ibeeq + Iceeq) * self.type
 
     def add_ac_stamps(self, A, z, x, iidx, freq):
         B = self.n1
@@ -246,8 +250,8 @@ class BJT():
         self.Ib.append(Ib)
         self.Ic.append(Ic)
 
-    def calc_oppoint(self, x):
-        self.calc_dc(x)
+    def calc_oppoint(self, x, usevlimit=True):
+        self.calc_dc(x, usevlimit)
 
         Cje = self.adjusted_options['Cje']
         Vje = self.options['Vje']
@@ -312,7 +316,7 @@ class BJT():
         self.oppoint['Ccs'] = Cscdep
         self.oppoint['Cbebc'] = Cbebc
 
-    def calc_dc(self, x):
+    def calc_dc(self, x, usevlimit=True):
         B   = self.n1
         C   = self.n2
         E   = self.n3
@@ -341,13 +345,14 @@ class BJT():
         Vc = x[C-1,0] if C > 0 else 0.
         Ve = x[E-1,0] if E > 0 else 0.
         Vs = x[S-1,0] if S > 0 else 0.
-        Vbe = Vb - Ve
-        Vbc = Vb - Vc
-        Vsc = Vs - Vc
+        Vbe = (Vb - Ve) * self.type
+        Vbc = (Vb - Vc) * self.type
+        Vsc = (Vs - Vc) * self.type
 
         gmin = 1e-12
-        
-        Vbe, Vbc = self.limit_bjt_voltages(Vbe, Vbc, Vt)
+       
+        if usevlimit == True:
+            Vbe, Vbc = self.limit_bjt_voltages(Vbe, Vbc, Vt)
 
         If = Is * (np.exp(Vbe / (Nf * Vt)) - 1.)
 
@@ -420,8 +425,8 @@ class BJT():
         Vc = x[C-1,0] if C > 0 else 0.
         Ve = x[E-1,0] if E > 0 else 0.
 
-        Vbe = Vb - Ve
-        Vbc = Vb - Vc
+        Vbe = (Vb - Ve) * self.type
+        Vbc = (Vb - Vc) * self.type
 
         Vbelim, Vbclim = self.limit_bjt_voltages(Vbe, Vbc, Vt)
 
