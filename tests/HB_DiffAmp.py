@@ -5,6 +5,9 @@ import setup
 from yalrf import YalRF, Netlist
 from yalrf.Analyses import AC, HarmonicBalance, MultiToneHarmonicBalance
 
+import time
+
+
 y = YalRF('Differential Amplifier')
 
 # circuit parameters
@@ -65,9 +68,11 @@ q2.options = q1.options
 q3.options = q1.options
 q4.options = q1.options
 
+begin = time.time()
+
 # run harmonic balance
 # hb = HarmonicBalance('HB1', 10e6, 10)
-hb = MultiToneHarmonicBalance('HB1', 10e6, 20)
+hb = MultiToneHarmonicBalance('HB1', 10e6, 80)
 # hb.options['maxiter'] = 100
 # converged, freqs, Vf, time, Vt = hb.run(y)
 
@@ -86,19 +91,30 @@ for vin in np.arange(100e-6, 50.1e-3, 2e-3):
     i4.ac = vin
 
     # run harmonic balance
-    converged, freqs, Vf, time, Vt = hb.run(y, V0)
+    converged, freqs, Vf, _, Vt = hb.run(y, V0)
     V0 = hb.V
     
     # get input and output information
     vi.append(hb.get_v('nb1')[1] - hb.get_v('nb2')[1])
     vout.append(hb.get_v('nc2')[1])
     
+end = time.time()
+
 vi = np.array(vi, dtype=complex)
 vout = np.array(vout, dtype=complex)
 gain = 20 * np.log10(np.abs(vout / vi))
 
+dc1 = y.add_dc_analysis('DC1')
+xdc = y.run('DC1')
+
+y.print_dc_voltages('DC1')
+
+print('Shape of V: {}'.format(hb.V.shape))
+print('Running time: {}'.format(end-begin))
+print('Ic of Q3: {}'.format(q3.oppoint['Ic']))
+
 ac1 = y.add_ac_analysis('AC1', start=1e6, stop=10e9, numpts=1000, sweeptype='linear')
-xac = y.run('AC1')
+xac = y.run('AC1', xdc)
 
 freqs = y.get_freqs('AC1')
 vi_ac = y.get_voltage('AC1', 'nb1') - y.get_voltage('AC1', 'nb2')
@@ -108,7 +124,7 @@ gain_ac = 20 * np.log10(np.abs(vout_ac / vi_ac))
 plt.figure(figsize=(14,5))
 
 vv = np.abs(vi) * 1e3
-plt.subplot(121)
+plt.subplot(122)
 plt.plot(vv, gain)
 plt.xlabel('Input Voltage [mV]')
 plt.ylabel('Voltage Gain [dB]')
@@ -123,7 +139,7 @@ plt.plot(vv[idx], gain[idx], color='red', marker='o')
 label = '{:.1f} dB @ \n{:.0f} mV'.format(gain[idx], vv[idx])
 plt.annotate(label, (vv[idx] , gain[idx]), textcoords="offset points", xytext=(0,5), ha='left', va='bottom', rotation=0)
 
-plt.subplot(122)
+plt.subplot(121)
 plt.semilogx(freqs, gain_ac, color='red')
 plt.xlabel('Frequency [Hz]')
 plt.ylabel('Voltage Gain [dB]')
@@ -139,7 +155,5 @@ label = '{:.1f} dB @ \n{:.0f} MHz'.format(gain_ac[idx], freqs[idx] / 1e6)
 plt.annotate(label, (freqs[idx] , gain_ac[idx]), textcoords="offset points", xytext=(5,0), ha='left', va='bottom', rotation=0)
 
 plt.show()
-
-
 
 
