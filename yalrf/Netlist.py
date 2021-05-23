@@ -882,9 +882,9 @@ class Netlist():
 
         netlist = Netlist(self.name)
 
-        netlist.devices = self.devices
-        netlist.node_name_to_idx = self.node_name_to_idx
-        netlist.node_idx_to_name = self.node_idx_to_name
+        netlist.devices = self.devices.copy()
+        netlist.node_name_to_idx = self.node_name_to_idx.copy()
+        netlist.node_idx_to_name = self.node_idx_to_name.copy()
 
         return netlist
 
