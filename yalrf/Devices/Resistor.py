@@ -40,6 +40,30 @@ class Resistor():
     def add_tran_stamps(self, A, z, x, iidx, xt, t, tstep):
         self.add_dc_stamps(A, z, x, iidx)
 
+    def add_mthb_stamps(self, Y, S, freq, freqidx):
+        y = 1. / self.R 
+        if freqidx == 0:
+            n = (self.n1 - 1) * S
+            m = (self.n2 - 1) * S
+            if (self.n1 > 0):
+                Y[n,n] += y
+            if (self.n2 > 0):
+                Y[m,m] += y
+            if (self.n1 > 0 and self.n2 > 0):
+                Y[n,m] -= y
+                Y[m,n] -= y
+        else:
+            n = (self.n1 - 1) * S + 2 * (freqidx - 1) + 1
+            m = (self.n2 - 1) * S + 2 * (freqidx - 1) + 1
+            Ymnk = np.array([[y, 0],[0, y]])
+            if (self.n1 > 0):
+                Y[n:n+2,n:n+2] += Ymnk 
+            if (self.n2 > 0):
+                Y[m:m+2,m:m+2] += Ymnk 
+            if (self.n1 > 0 and self.n2 > 0):
+                Y[n:n+2,m:m+2] -= Ymnk 
+                Y[m:m+2,n:n+2] -= Ymnk 
+
     def get_tran_voltage(self, x):
         V1 = x[:,self.n1-1] if self.n1 > 0 else np.zeros((len(x),1))
         V2 = x[:,self.n2-1] if self.n2 > 0 else np.zeros((len(x),1))

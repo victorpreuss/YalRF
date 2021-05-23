@@ -61,5 +61,30 @@ class Inductor():
         A[iidx][iidx] = -1.0
         z[iidx] = z[iidx] - Ieq
 
+    def add_mthb_stamps(self, Y, S, freq, freqidx):
+        if freqidx == 0:
+            n = (self.n1 - 1) * S
+            m = (self.n2 - 1) * S
+            y = 1e6
+            if (self.n1 > 0):
+                Y[n,n] += y
+            if (self.n2 > 0):
+                Y[m,m] += y
+            if (self.n1 > 0 and self.n2 > 0):
+                Y[n,m] -= y
+                Y[m,n] -= y
+        else:
+            n = (self.n1 - 1) * S + 2 * (freqidx - 1) + 1
+            m = (self.n2 - 1) * S + 2 * (freqidx - 1) + 1
+            y = 1. / (1j * 2 * np.pi * freq * self.L)
+            Ymnk = np.array([[y.real, -y.imag],[y.imag, y.real]])
+            if (self.n1 > 0):
+                Y[n:n+2,n:n+2] += Ymnk 
+            if (self.n2 > 0):
+                Y[m:m+2,m:m+2] += Ymnk 
+            if (self.n1 > 0 and self.n2 > 0):
+                Y[n:n+2,m:m+2] -= Ymnk 
+                Y[m:m+2,n:n+2] -= Ymnk 
+
     def __str__(self):
         return 'Inductor: {}\nNodes = {} -> {}\nValue = {}\n'.format(self.name, self.n1, self.n2, self.L)

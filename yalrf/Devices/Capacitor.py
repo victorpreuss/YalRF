@@ -59,6 +59,31 @@ class Capacitor():
         z[self.n1] = z[self.n1] - Ieq
         z[self.n2] = z[self.n2] + Ieq
 
+    def add_mthb_stamps(self, Y, S, freq, freqidx):
+        if freqidx == 0:
+            n = (self.n1 - 1) * S
+            m = (self.n2 - 1) * S
+            y = 1e-12 # open circuit at DC
+            if (self.n1 > 0):
+                Y[n,n] += y
+            if (self.n2 > 0):
+                Y[m,m] += y
+            if (self.n1 > 0 and self.n2 > 0):
+                Y[n,m] -= y
+                Y[m,n] -= y
+        else:
+            n = (self.n1 - 1) * S + 2 * (freqidx - 1) + 1
+            m = (self.n2 - 1) * S + 2 * (freqidx - 1) + 1
+            y = 1j * 2 * np.pi * freq * self.C
+            Ymnk = np.array([[y.real, -y.imag],[y.imag, y.real]])
+            if (self.n1 > 0):
+                Y[n:n+2,n:n+2] += Ymnk 
+            if (self.n2 > 0):
+                Y[m:m+2,m:m+2] += Ymnk 
+            if (self.n1 > 0 and self.n2 > 0):
+                Y[n:n+2,m:m+2] -= Ymnk 
+                Y[m:m+2,n:n+2] -= Ymnk 
+
     def save_tran(self, xt, tstep):
         # get last capacitor voltages
         Vnprev = self.get_voltage(xt[-2])
