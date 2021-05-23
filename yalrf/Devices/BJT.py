@@ -459,7 +459,7 @@ class BJT():
     # TODO: get_hb_params() is a temporary implementations to test
     #       the harmonic balance algorithm. Eventually the complete
     #       BJT model should be used.
-    def get_hb_params(self, Vb, Vc, Ve, Vs, s):
+    def get_hb_params(self, Vb, Vc, Ve, Vs, s, Vbold, Vcold, Veold):
         Vt  = k * self.options['Temp'] / e
         Is  = self.adjusted_options['Is'] 
         Nf  = self.options['Nf'] 
@@ -496,14 +496,11 @@ class BJT():
         Vbc = Vb - Vc + 1e-6
         Vsc = Vs - Vc + 1e-6
 
-        # Vbe = self.VbeoldHB[s] + 10. * Nf * Vt * np.tanh((Vbe - self.VbeoldHB[s]) / (10. * Nf * Vt))
-        # Vbc = self.VbcoldHB[s] + 10. * Nr * Vt * np.tanh((Vbc - self.VbcoldHB[s]) / (10. * Nr * Vt))
+        Vbeold = Vbold - Veold
+        Vbcold = Vbold - Vcold
 
-        self.VbeoldHB[s] = Vbe
-        self.VbcoldHB[s] = Vbc
-
-        # print(Vbe)
-        # print(Vbc)
+        Vbe = Vbeold + 10. * Nf * Vt * np.tanh((Vbe - Vbeold) / (10. * Nf * Vt))
+        Vbc = Vbcold + 10. * Nr * Vt * np.tanh((Vbc - Vbcold) / (10. * Nr * Vt))
 
         gmin = 1e-12
         cmin = 1e-18
