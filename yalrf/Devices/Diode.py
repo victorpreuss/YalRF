@@ -235,7 +235,7 @@ class Diode():
         self.oppoint['Cdiff'] = Tt * gd
         self.oppoint['Qd'] = Qd
 
-    def calc_dc(self, x):
+    def calc_dc(self, x, usevlimit=True):
         Is = self.adjusted_options['Is']
         N = self.options['N']
         Isr = self.adjusted_options['Isr']
@@ -256,7 +256,8 @@ class Diode():
         Id = self.It + self.gt * Vtot
         Vd = Vtot - Id * Rs
 
-        Vd = self.limit_diode_voltage(Vd, Vt)
+        if usevlimit == True:
+            Vd = self.limit_diode_voltage(Vd, Vt)
 
         # forward current
         Idf = Is * (exp_lim(Vd / (N * Vt)) - 1.)
@@ -335,23 +336,95 @@ class Diode():
     #       the complete diode model should be used.
     def get_i(self, Vd, Vdold=0):
         Is = self.adjusted_options['Is']
-        N  = self.options['N']
-        Vt = k * self.options['Temp'] / e
+        N = self.options['N']
+        Isr = self.adjusted_options['Isr']
+        Nr = self.options['Nr']
+        Ikf = self.adjusted_options['Ikf']
+        Bv = self.options['Bv']
+        Ibv = self.adjusted_options['Ibv']
+        Rs = self.adjusted_options['Rs']
+        T = self.options['Temp']
+        Vt = k * T / e
 
         # Vd = Vdold + 10. * N * Vt * np.tanh((Vd - Vdold) / (10. * N * Vt))
-        Id = Is * (exp_lim(Vd / (N * Vt)) - 1.)
 
-        return Id
+        Idf = Is * (exp_lim(Vd / (N * Vt)) - 1.)
+        Idr = Isr * (exp_lim(Vd / (Nr * Vt)) - 1.)
+
+        if isfinite(Ikf):
+            Idf = Idf * np.sqrt(Ikf / (Ikf + Idf))
+
+        Ibr = 0.
+        if isfinite(Bv):
+            Ibr = Ibv * exp_lim(- Bv / Vt) * (1. - exp_lim(- Vd / Vt))
+
+        # diode total current
+        Id = Idf + Idr + Ibr# + (Vd * 1e-12)
+
+        return Id - gd * Id
 
     def get_g(self, Vd, Vdold=0):
         Is = self.adjusted_options['Is']
-        N  = self.options['N']
-        Vt = k * self.options['Temp'] / e
+        N = self.options['N']
+        Isr = self.adjusted_options['Isr']
+        Nr = self.options['Nr']
+        Ikf = self.adjusted_options['Ikf']
+        Bv = self.options['Bv']
+        Ibv = self.adjusted_options['Ibv']
+        Rs = self.adjusted_options['Rs']
+        T = self.options['Temp']
+        Vt = k * T / e
 
         # Vd = Vdold + 10. * N * Vt * np.tanh((Vd - Vdold) / (10. * N * Vt))
-        g = Is / (N * Vt) * exp_lim(Vd / (N * Vt))
 
-        return g
+        gdf = Is / (N * Vt) * exp_lim(Vd / (N * Vt))
+        gdr = Isr / (Nr * Vt) * exp_lim(Vd / (Nr * Vt))
+
+        if isfinite(Ikf):
+            gdf = gdf * (1. - 0.5 * Idf / (Ikf + Idf)) * np.sqrt(Ikf / (Ikf + Idf))
+        gbr = 0.
+
+        if isfinite(Bv):
+            gbr = Ibv / Vt * exp_lim(- (Bv + Vd) / Vt)
+
+        # diode total conductance
+        gd = gdf + gdr + gbr
+
+        return gd
+
+    def get_mthb_params(self, Vd, Vdold):
+        Is = self.options['Is']
+        N = self.options['N']
+        Isr = self.options['Isr']
+        Nr = self.options['Nr']
+        Ikf = self.options['Ikf']
+        Bv = self.options['Bv']
+        Ibv = self.options['Ibv']
+        Rs = self.options['Rs']
+        T = self.options['Temp']
+        Vt = k * T / e
+
+        Vd = Vdold + 10. * N * Vt * np.tanh((Vd - Vdold) / (10. * N * Vt))
+
+        Idf = Is * (exp_lim(Vd / (N * Vt)) - 1.)
+        Idr = Isr * (exp_lim(Vd / (Nr * Vt)) - 1.)
+        gdf = Is / (N * Vt) * exp_lim(Vd / (N * Vt))
+        gdr = Isr / (Nr * Vt) * exp_lim(Vd / (Nr * Vt))
+
+        if isfinite(Ikf):
+            Idf = Idf * np.sqrt(Ikf / (Ikf + Idf))
+            gdf = gdf * (1. - 0.5 * Idf / (Ikf + Idf)) * np.sqrt(Ikf / (Ikf + Idf))
+
+        Ibr = 0.
+        gbr = 0.
+        if isfinite(Bv):
+            Ibr = Ibv * exp_lim(- Bv / Vt) * (1. - exp_lim(- Vd / Vt))
+            gbr = Ibv / Vt * exp_lim(- (Bv + Vd) / Vt)
+
+        Id = Idf + Idr + Ibr
+        gd = gdf + gdr + gbr
+
+        return gd, Id
 
     def __str__(self):
         return 'Diode: {}\nNodes = {} -> {}\n'.format(self.name, self.n1, self.n2)
