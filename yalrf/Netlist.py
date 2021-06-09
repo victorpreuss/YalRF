@@ -685,6 +685,14 @@ class Netlist():
         self.devices.append(opamp)
         return opamp
 
+    def add_cubicnl(self, name, n1, n2, alpha):
+        n1 = self.add_node(n1)
+        n2 = self.add_node(n2)
+        
+        cubicnl = CubicNonLinearity(name, n1, n2, alpha)
+        self.devices.append(cubicnl)
+        return cubicnl
+
     # TODO:
     # def add_mosfet(self, name, n1, n2, n3, n4='gnd'):
     # def add_iprobe(self, name, n1, n2):

@@ -122,7 +122,19 @@ class MultiToneHarmonicBalance:
         v = self.Vf[n]
         return v
 
-    def run_oscillator(self, netlist, f0, numharmonics, V0, node):
+    def convert_to_time(self, xf):
+        S = 32 * self.K # increase number of time samples
+        t = 2 / self.freq / S * np.linspace(0, S, S)
+        xt = np.zeros(S)
+        for s in range(S):
+            xt[s] = xf[0].real
+            for k in range(1, self.K+1):
+                xt[s] = xt[s] + xf[k].real * np.cos(2. * np.pi * k * s / (S / 2)) - \
+                                xf[k].imag * np.sin(2. * np.pi * k * s / (S / 2))
+
+        return t, xt
+
+    def run_oscillator(self, netlist, f0, numharmonics, V0, node, useprev=False):
 
         netlist = netlist.copy()
 
@@ -153,7 +165,10 @@ class MultiToneHarmonicBalance:
             if info['itercnt'] > 0:
                 converged, freqs, Vf, time, Vt = self.run(netlist, self.V)
             else:
-                converged, freqs, Vf, time, Vt = self.run(netlist)
+                if info['useprev'] == True:
+                    converged, freqs, Vf, time, Vt = self.run(netlist, self.V)
+                else:
+                    converged, freqs, Vf, time, Vt = self.run(netlist)
 
             # if HB failed to converge, return a bad convergence value to minimizer
             if not converged:
@@ -185,13 +200,13 @@ class MultiToneHarmonicBalance:
 
         try:
             x0 = [f0, V0]
-            args = ({'itercnt' : 0, 'osc_node' : node, 'result' : 0},)
+            args = ({'itercnt' : 0, 'osc_node' : node, 'result' : 0, 'useprev' : useprev},)
             xopt = optimize.fmin(func     = objFunc,
                                  x0       = x0,
                                  args     = args,
-                                 xtol     = 1e-3,
-                                 ftol     = 1e-3,
-                                 maxfun   = 200,
+                                 xtol     = 1e-12,
+                                 ftol     = 1e-12,
+                                 maxfun   = 300,
                                  disp     = True,
                                  retall   = False,
                                  full_output = True)[0]
@@ -322,7 +337,7 @@ class MultiToneHarmonicBalance:
         # if first attempt fails, try continuation method
         if converged == False:
             Vprev = V.copy()
-            maxiter = 40
+            maxiter = 50
             alpha = 0.1
             inc = 1.4
             dec = 1.2
@@ -424,7 +439,7 @@ class MultiToneHarmonicBalance:
             it[:] = 0
             qt[:] = 0
             for dev in self.nonlin_devs:
-                if isinstance(dev, Diode):
+                if isinstance(dev, Diode) or isinstance(dev, CubicNonLinearity):
                     n1 = dev.n1 - 1
                     n2 = dev.n2 - 1
                     Id = np.zeros((self.S,1))

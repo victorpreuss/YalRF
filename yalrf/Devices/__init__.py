@@ -18,3 +18,5 @@ from .Opamp import Opamp
 from .Diode import Diode
 from .BJT import BJT
 from .Mosfet import Mosfet
+from .CubicNonLinearity import CubicNonLinearity
+
