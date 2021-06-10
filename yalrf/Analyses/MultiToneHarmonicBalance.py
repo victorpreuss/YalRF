@@ -509,6 +509,8 @@ class MultiToneHarmonicBalance:
 
                         Ib[s], Ic[s], Ie[s], Qbe[s], Qbc[s], Qsc[s], gmu[s], gpi[s], gmf[s], gmr[s], Cbc[s], Cbe[s], Cbebc[s], Csc[s] = dev.get_hb_params(Vb, Vc, Ve, Vs, s, Vbold, Vcold, Veold)
 
+                    dev.Ic = Ic
+
                     gmuf = self.DFT @ np.diag(gmu) @ self.IDFT
                     gpif = self.DFT @ np.diag(gpi) @ self.IDFT
                     gmff = self.DFT @ np.diag(gmf) @ self.IDFT
