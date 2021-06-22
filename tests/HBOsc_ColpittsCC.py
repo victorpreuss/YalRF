@@ -17,7 +17,7 @@ c2 = 3.9e-12
 r1 = 3e3
 r2 = 6.8e3
 re = 1.5e3
-l1 = 6.944e-9
+l1 = 6.944431e-9
 
 # VCC
 y.add_idc('I1', 'nx', 'gnd', dc=vcc)
@@ -54,7 +54,7 @@ q1.options['Br'] = 5
 q1.options['Vaf'] = 60
 q1.options['Var'] = 20
 
-numharmonics = 30
+numharmonics = 50
 freq = 1.2e9
 V0 = 1
 
@@ -65,7 +65,7 @@ converged, freqs, Vf, _, _ = hb.run_oscillator(y, freq, numharmonics, V0, 'nind'
 
 hb.print_v('nind')
 hb.plot_v('nind')
-# hb.plot_v('nl')
+hb.plot_v('nl')
 plt.show()
 
 

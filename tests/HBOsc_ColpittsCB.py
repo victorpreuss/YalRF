@@ -30,8 +30,8 @@ y.add_gyrator('G2', 'nx2', 'nvee', 'gnd', 'gnd', 1)
 # passives
 #y.add_resistor('Rb', 'nb', 'gnd', rb)
 y.add_resistor('Re', 'ne', 'nvee', re)
-y.add_resistor('Rx', 'nvccx', 'nvcc', 10)
-y.add_inductor('L1', 'nvccx', 'nc', l)
+y.add_resistor('Rx', 'nvcc', 'nc', 8.73e3)
+y.add_inductor('L1', 'nvcc', 'nc', l)
 y.add_capacitor('C1', 'ne', 'nc', c1)
 y.add_capacitor('C2', 'nvcc', 'ne', c2)
 
@@ -63,7 +63,7 @@ q1.options['Fc'] = 0.5
 q1.options['Tf'] = 427e-12
 q1.options['Tr'] = 50.3e-9
 
-numharmonics = 10
+numharmonics = 20
 freq = 9e6
 V0 = 1
 
@@ -74,6 +74,24 @@ converged, freqs, Vf, _, _ = hb.run_oscillator(y, freq, numharmonics, V0, 'nc')
 
 hb.print_v('nc')
 hb.plot_v('nc')
+
+vout = hb.get_v('nc')[0:11]
+freqs = freqs[0:11]
+
+plt.figure(figsize=(10,6))
+plt.rc('axes', titlesize=14)    # fontsize of the axes title
+plt.rc('axes', labelsize=12)    # fontsize of the x and y labels
+plt.stem(freqs / 1e6, np.abs(vout), use_line_collection=True, markerfmt='r^', linefmt='r')
+for f, v in zip(freqs, vout):
+    label = r'{:.3f} $\angle$ {:.1f}$^\circ$'.format(np.abs(v), np.degrees(np.angle(v)))
+    # if f <= 3 * self.freqs[1]:
+    plt.annotate(label, (f / 1e6, np.abs(v)), textcoords="offset points", xytext=(0,5), ha='left', va='bottom', rotation=45)
+plt.xlabel('frequency [MHz]')
+plt.ylabel('V(\'nc\') [V]')
+plt.grid()
+plt.tight_layout()
+
+
 plt.show()
 
 

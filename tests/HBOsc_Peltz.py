@@ -22,13 +22,6 @@ freq = 0
 y.add_idc('I1', 'nx', 'gnd', dc=vcc)
 y.add_gyrator('G1', 'nx', 'nvcc', 'gnd', 'gnd', 1)
 
-# vin oscprobe
-Voscprobe = y.add_iac('I2', 'ny', 'gnd', ac=0)
-y.add_gyrator('G2', 'ny', 'nz', 'gnd', 'gnd', 1)
-
-# ideal harmonic filter of oscprobe
-Zoscprobe = y.add_idealharmonicfilter('X1', 'nz', 'nb', freq)
-
 # tank circuit
 y.add_resistor('R1', 'nvcc', 'nb', r)
 y.add_inductor('L1', 'nvcc', 'nb', l)
@@ -46,80 +39,14 @@ q1.options['Bf'] = 200
 q1.options['Br'] = 1
 q2.options = q1.options.copy()
 
-hb = MultiToneHarmonicBalance('HB1', 1, 10)
+numharmonics = 10
+freq = 80e3
+V0 = 0.1
+
+hb = MultiToneHarmonicBalance('HB1')
 hb.options['maxiter'] = 100
-Vprev = 0
 
-def objFunc(x, info):
-
-    global hb
-    global Vprev
-
-    # get new solution candidates
-    fosc = x[0]
-    Vosc = x[1]
-
-    # update oscprobe values
-    Voscprobe.ac = Vosc
-    Voscprobe.freq = fosc
-    Zoscprobe.freq = fosc
-
-    # run harmonic balance
-
-    hb.freq = fosc
-    if info['itercnt'] > 0:
-        converged, freqs, Vf, time, Vt = hb.run(y, Vprev)
-    else:
-        converged, freqs, Vf, time, Vt = hb.run(y)
-    Vprev = hb.V
-
-    # if HB failed to converge, return a bad convergence value to minimizer
-    if not converged:
-        return 1e2
-
-    # get nodes of IdealHarmonicFilter
-    n1 = hb.get_node_idx('nb')
-    n2 = hb.get_node_idx('nz')
-
-    # mag(Yosc) is the objective function to be minimized
-    Voscx = Vf[n1,1]                             # voltage across oscprobe
-    Iosc  = (Vf[n1,1] - Vf[n2,1]) * Zoscprobe.g  # current through oscprobe
-    Yosc  = Iosc / Voscx
-
-    info['itercnt'] += 1
-    print('\nIter\tFreq [kHz]\tVosc [V]\tmag(Yosc)')
-    print('{}\t{:.8f}\t{:.8f}\t{:.2e}\n'.format(info['itercnt'], fosc / 1e3, Vosc, abs(Yosc)))
-
-    return abs(Yosc)
-
-x0 = [ 100e3, 0.5]
-result = optimize.fmin(func     = objFunc,
-                       x0       = x0,
-                       args     = ({'itercnt' : 0},),
-                       xtol     = 1e-3,
-                       ftol     = 1e-3,
-                       maxfun   = 200,
-                       disp     = True,
-                       retall   = False,
-                       full_output = True)
-
-xopt = result[0]
-
-# get solution and unnormalize it
-fosc = xopt[0]
-Vosc = xopt[1]
-
-# update oscprobe values
-Voscprobe.ac = Vosc
-Voscprobe.freq = fosc
-Zoscprobe.freq = fosc
-
-# run harmonic balance
-hb = MultiToneHarmonicBalance('HB1', fosc, 10)
-converged, freqs, Vf, time, Vt = hb.run(y, Vprev)
-
-print('Frequency of oscillation = {} Hz'.format(fosc))
-print('Oscillation amplitude = {} V'.format(Vosc))
+converged, freqs, Vf, _, _ = hb.run_oscillator(y, freq, numharmonics, V0, 'nb')
 
 hb.print_v('nb')
 hb.plot_v('nb')

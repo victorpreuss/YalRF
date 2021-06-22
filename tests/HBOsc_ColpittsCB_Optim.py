@@ -22,6 +22,8 @@ n = 0.2 # capactive divider ratio (feedback)
 c1 = ct / (1 - n)
 c2 = ct / n
 
+# rs = l ** 2 * (2 * np.pi * fosc) ** 2 / rl
+
 numharmonics = 20
 
 f0 = 1 / (2 * np.pi * np.sqrt(l * ct))
@@ -43,6 +45,7 @@ y.add_gyrator('G2', 'ny1', 'nb', 'gnd', 'gnd', 1)
 y.add_idc('I3', 'gnd', 'ne', dc=ibias)
 
 # passives
+# y.add_resistor('Rs', 'nvcc', 'nvccx', rs)
 y.add_resistor('Rl', 'nvcc', 'nc', rl)
 y.add_inductor('L1', 'nvcc', 'nc', l)
 C1 = y.add_capacitor('C1', 'nc', 'ne', c1)
@@ -63,83 +66,83 @@ plt.figure()
 plt.plot(q1.Ic)
 plt.show()
 
-begin = time.time()
+# begin = time.time()
 
-# loop varying 'n'
-iter_cnt = 0
-freqs = []
-vtank = []
-vtank2 = []
-vtank3 = []
-ipk = []
-pwr = []
-vtank_calc = []
-eff = []
-nvec = np.geomspace(0.05, 0.5, 20)
-for n in nvec:
-    # update netlist
-    C1.C = ct / (1 - n)
-    C2.C = ct / n
+# # loop varying 'n'
+# iter_cnt = 0
+# freqs = []
+# vtank = []
+# vtank2 = []
+# vtank3 = []
+# ipk = []
+# pwr = []
+# vtank_calc = []
+# eff = []
+# nvec = np.geomspace(0.05, 0.5, 20)
+# for n in nvec:
+#     # update netlist
+#     C1.C = ct / (1 - n)
+#     C2.C = ct / n
     
-    # run oscillator analysis
-    if iter_cnt == 0:
-        hb.run_oscillator(y, f0, numharmonics, V0, 'nc')
-    else:
-        hb.run_oscillator(y, f0, numharmonics, V0, 'nc', useprev=True)
+#     # run oscillator analysis
+#     if iter_cnt == 0:
+#         hb.run_oscillator(y, f0, numharmonics, V0, 'nc')
+#     else:
+#         hb.run_oscillator(y, f0, numharmonics, V0, 'nc', useprev=True)
 
-    # get results
-    freqs.append(hb.freq)
-    ipk.append(np.max(q1.Ic))
-    vtank2.append(np.abs(hb.get_v('nc')[2]) / np.abs(hb.get_v('nc')[1]))
-    vtank3.append(np.abs(hb.get_v('nc')[3]) / np.abs(hb.get_v('nc')[1]))
-    vtank.append(np.abs(hb.get_v('nc')[1]))
-    vtank_calc.append(2 * ibias * rl * (1 - n))
-    eff.append(np.abs(hb.get_v('nc')[1])**2 / (2 * rl) / (vcc * ibias))
+#     # get results
+#     freqs.append(hb.freq)
+#     ipk.append(np.max(q1.Ic))
+#     vtank2.append(np.abs(hb.get_v('nc')[2]) / np.abs(hb.get_v('nc')[1]))
+#     vtank3.append(np.abs(hb.get_v('nc')[3]) / np.abs(hb.get_v('nc')[1]))
+#     vtank.append(np.abs(hb.get_v('nc')[1]))
+#     vtank_calc.append(2 * ibias * rl * (1 - n))
+#     eff.append(np.abs(hb.get_v('nc')[1])**2 / (2 * rl) / (vcc * ibias))
 
-    iter_cnt += 1
+#     iter_cnt += 1
 
-end = time.time()
+# end = time.time()
 
-print('Shape of V: {}'.format(hb.V.shape))
-print('Running time: {}'.format(end-begin))
+# print('Shape of V: {}'.format(hb.V.shape))
+# print('Running time: {}'.format(end-begin))
 
-plt.figure()
-plt.plot(nvec, vtank, label='Simulated')
-plt.plot(nvec, vtank_calc, label='Calculated')
-plt.xlabel('$\eta$')
-plt.ylabel('$V_{tank}$ [V]')
-plt.grid()
+# plt.figure()
+# plt.plot(nvec, vtank, label='Simulated')
+# plt.plot(nvec, vtank_calc, label='Calculated')
+# plt.xlabel('$\eta$')
+# plt.ylabel('$V_{tank}$ [V]')
+# plt.grid()
 
-plt.figure()
-plt.plot(nvec, eff)
-plt.xlabel('$\eta$')
-plt.ylabel('Efficiency')
-plt.grid()
+# plt.figure()
+# plt.plot(nvec, eff)
+# plt.xlabel('$\eta$')
+# plt.ylabel('Efficiency')
+# plt.grid()
 
-plt.figure()
-plt.plot(nvec, vtank2)
-plt.xlabel('$\eta$')
-plt.ylabel('$V_{tank2}$ [V]')
-plt.grid()
+# plt.figure()
+# plt.plot(nvec, vtank2)
+# plt.xlabel('$\eta$')
+# plt.ylabel('$V_{tank2}$ [V]')
+# plt.grid()
 
-plt.figure()
-plt.plot(nvec, vtank3)
-plt.xlabel('$\eta$')
-plt.ylabel('$V_{tank3}$ [V]')
-plt.grid()
+# plt.figure()
+# plt.plot(nvec, vtank3)
+# plt.xlabel('$\eta$')
+# plt.ylabel('$V_{tank3}$ [V]')
+# plt.grid()
 
-plt.figure()
-plt.plot(nvec, ipk)
-plt.xlabel('$\eta$')
-plt.ylabel('$I_{c,pk}$ [A]')
-plt.grid()
+# plt.figure()
+# plt.plot(nvec, ipk)
+# plt.xlabel('$\eta$')
+# plt.ylabel('$I_{c,pk}$ [A]')
+# plt.grid()
 
-plt.figure()
-plt.plot(nvec, freqs)
-plt.xlabel('$\eta$')
-plt.ylabel('$f_{osc}$ [MHz]')
-plt.grid()
-plt.show()
+# plt.figure()
+# plt.plot(nvec, freqs)
+# plt.xlabel('$\eta$')
+# plt.ylabel('$f_{osc}$ [MHz]')
+# plt.grid()
+# plt.show()
 
 # def objFunc(x, info):
 
