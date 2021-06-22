@@ -194,12 +194,12 @@ class BJT():
         A[B][C] = A[B][C] - Ybc - Ybebc
         A[B][E] = A[B][E] - Ybe
         A[B][S] = A[B][S] + 0.
-        A[C][B] = A[C][B] + gmf - Ybc - gmr
-        A[C][C] = A[C][C] + Ycs + Ybc + gmr
+        A[C][B] = A[C][B] + gmf - Ybc + gmr
+        A[C][C] = A[C][C] + Ycs + Ybc - gmr
         A[C][E] = A[C][E] - gmf
         A[C][S] = A[C][S] - Ycs
-        A[E][B] = A[E][B] + gmr - gmf - Ybe - Ybebc
-        A[E][C] = A[E][C] - gmr + Ybebc
+        A[E][B] = A[E][B] - gmr - gmf - Ybe - Ybebc
+        A[E][C] = A[E][C] + gmr + Ybebc
         A[E][E] = A[E][E] + gmf + Ybe
         A[E][S] = A[E][S] + 0.
         A[S][B] = A[S][B] + 0.
@@ -354,25 +354,25 @@ class BJT():
         if usevlimit == True:
             Vbe, Vbc = self.limit_bjt_voltages(Vbe, Vbc, Vt)
 
-        If = Is * (np.exp(Vbe / (Nf * Vt)) - 1.)
+        If = Is * (exp_lim(Vbe / (Nf * Vt)) - 1.)
 
         Ibei = If / Bf
-        Iben = Ise * (np.exp(Vbe / (Ne * Vt)) - 1.) + gmin * Vbe
-        Ibe  = Ibei + Iben
+        Iben = Ise * (exp_lim(Vbe / (Ne * Vt)) - 1.)
+        Ibe  = Ibei + Iben + gmin * Vbe
 
-        gbei = Is / (Nf * Vt * Bf) * np.exp(Vbe / (Nf * Vt))
-        gben = Ise / (Ne * Vt) * np.exp(Vbe / (Ne * Vt)) + gmin
-        gpi  = gbei + gben
+        gbei = Is / (Nf * Vt * Bf) * exp_lim(Vbe / (Nf * Vt))
+        gben = Ise / (Ne * Vt) * exp_lim(Vbe / (Ne * Vt))
+        gpi  = gbei + gben + gmin
 
-        Ir = Is * (np.exp(Vbc / (Nr * Vt)) - 1.)
+        Ir = Is * (exp_lim(Vbc / (Nr * Vt)) - 1.)
 
         Ibci = Ir / Br
-        Ibcn = Isc * (np.exp(Vbc / (Nc * Vt)) - 1.) + gmin * Vbc
-        Ibc  = Ibci + Ibcn
+        Ibcn = Isc * (exp_lim(Vbc / (Nc * Vt)) - 1.)
+        Ibc  = Ibci + Ibcn + gmin * Vbc
 
-        gbci = Is / (Nr * Vt * Br) * np.exp(Vbc / (Nr * Vt))
-        gbcn = Isc / (Nc * Vt) * np.exp(Vbc / (Nc * Vt)) + gmin
-        gmu  = gbci + gbcn
+        gbci = Is / (Nr * Vt * Br) * exp_lim(Vbc / (Nr * Vt))
+        gbcn = Isc / (Nc * Vt) * exp_lim(Vbc / (Nc * Vt))
+        gmu  = gbci + gbcn + gmin
 
         Q1 = 1. / (1. - (Vbc / Vaf) - (Vbe / Var))
         Q2 = (If / Ikf) + (Ir / Ikr)
@@ -492,9 +492,9 @@ class BJT():
         Tr = self.options['Tr']
 
         # TODO: improve this later
-        Vbe = Vb - Ve + 1e-6
-        Vbc = Vb - Vc + 1e-6
-        Vsc = Vs - Vc + 1e-6
+        Vbe = Vb - Ve #+ 1e-6
+        Vbc = Vb - Vc #+ 1e-6
+        Vsc = Vs - Vc #+ 1e-6
 
         Vbeold = Vbold - Veold
         Vbcold = Vbold - Vcold
@@ -554,7 +554,7 @@ class BJT():
             Qsc = Cjs * Vsc / (1 + (Mjs * Vsc) / (2. * Vjs))
 
         Tff = Tf * (1. + Xtf * np.square(If / (If + Itf)) * exp_lim(Vbc / (1.44 * Vtf)))
-        dTff_dVbe = Tf * Xtf * 2 * gif * If * Itf * exp_lim(Vbc / (1.44 * Vtf))
+        dTff_dVbe = (Tf * Xtf * 2 * gif * If * Itf / (If + Itf)**3) * exp_lim(Vbc / (1.44 * Vtf))
         dTff_dVbc = (Tf * Xtf / (1.44 * Vtf)) * np.square(If / (If + Itf)) * exp_lim(Vbc / (1.44 * Vtf))
 
         Cbcidep = Xcjc * Cbcdep
