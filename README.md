@@ -4,29 +4,65 @@ YalRF is an open-source circuit simulator written in Python. The package contain
 
 The main goal of this project is to implement a stable and powerful multi-tone harmonic balance engine with support to autonomous circuits.
 
-Another goal will be to integrate YalRF with the scikit-rf / openEMS / SignalIntegrity packages to create a powerful open-source development environment for RF engineers.
+Another goal will be to integrate YalRF with the scikit-rf / openEMS / SignalIntegrity packages.
 
 Example of usage:
 ```python
-from yalrf import YalRF
+import matplotlib.pyplot as plt
+from yalrf import Netlist
+from yalrf.Analyses import MultiToneHarmonicBalance
 
-y = YalRF('Voltage Divider')
+net = Netlist('Peltz Oscillator')
 
-y.add_resistor('R1', 'n1', 'n2', 100)
-y.add_resistor('R2', 'n2', 'gnd', 25)
+# circuit parameters
+vcc = 10
+r = 200e3
+l = 0.5e-3
+c = 10e-9
+re = 50e3
 
-v1 = y.add_vdc('V1', 'n1', 'gnd', 1)
+# VCC
+net.add_idc('I1', 'nx', 'gnd', dc=vcc)
+net.add_gyrator('G1', 'nx', 'nvcc', 'gnd', 'gnd', 1)
 
-dc = y.add_dc_analysis('DC1')
+# tank circuit
+net.add_resistor('R1', 'nvcc', 'nb', r)
+net.add_inductor('L1', 'nvcc', 'nb', l)
+net.add_capacitor('C1', 'nvcc', 'nb', c)
 
-y.run('DC1')
-y.print_dc_voltages('DC1')
-y.print_dc_currents('DC1')
+# emitter resistance
+net.add_resistor('RE', 'ne', 'gnd', re)
+
+# bjts
+q1 = net.add_bjt('Q1', 'nb', 'nvcc', 'ne')
+q2 = net.add_bjt('Q2', 'nvcc', 'nb', 'ne')
+
+q1.options['Is'] = 1e-16
+q1.options['Bf'] = 200
+q1.options['Br'] = 1
+q2.options = q1.options.copy()
+
+numharmonics = 10
+freq = 80e3
+V0 = 0.1
+
+hb = MultiToneHarmonicBalance('HB1')
+hb.options['maxiter'] = 100
+
+converged, freqs, Vf, _, _ = hb.run_oscillator(net, freq, numharmonics, V0, 'nb')
+
+hb.print_v('nb')
+hb.plot_v('nb')
+plt.show()
 ```
 
 # Dependencies
 
 `conda install python numpy scipy matplotlib`
+
+# Acknowledgements
+
+The API for netlist description was based on ahkab. Many device models currently used were referenced from the Qucs documentation.
 
 # TODO List
 

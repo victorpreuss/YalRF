@@ -551,7 +551,7 @@ class MultiToneHarmonicBalance:
                         dIdV[i:j,i:j] += (+ gmuf - gmrf)
                         dQdV[i:j,i:j] += (+ Cbcf + Cscf)
                         it[i:j] += Ic
-                        qt[i:j] -= Qbc - Qsc
+                        qt[i:j] -= Qbc - Qsc # TODO: the sign of Qsc might be wrong
 
                         if E >= 0:
                             x = E * self.S

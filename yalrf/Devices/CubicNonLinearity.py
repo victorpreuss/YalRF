@@ -22,7 +22,7 @@ class CubicNonLinearity():
         V2 = x[self.n2-1] if self.n2 > 0 else 0.
         V = V1 - V2
 
-        g = 2 * self.alpha * V*V
+        g = 3 * self.alpha * V*V
         I = self.alpha * V*V*V
         Ieq = I - g * V
 

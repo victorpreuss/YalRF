@@ -27,7 +27,7 @@ d1.options['Area'] = 1
 
 begin = time.time()
 
-hb = MultiToneHarmonicBalance('HB1', [1e6, 10e3], [20, 10])
+hb = MultiToneHarmonicBalance('HB1', [1e6, 10e3], [10, 10])
 hb.options['reltol'] = 1e-3
 hb.options['abstol'] = 1e-6
 

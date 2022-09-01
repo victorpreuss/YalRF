@@ -204,8 +204,8 @@ class Diode():
         self.Id.append(Idnn)
         self.Ic.append(self.Icnn)
 
-    def calc_oppoint(self, x):
-        self.calc_dc(x)
+    def calc_oppoint(self, x, usevlimit=False):
+        self.calc_dc(x, usevlimit)
 
         Cj0 = self.adjusted_options['Cj0']
         M = self.options['M']

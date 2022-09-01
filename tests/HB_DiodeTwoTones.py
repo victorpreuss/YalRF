@@ -23,7 +23,7 @@ d1.options['Area'] = 1
 
 begin = time.time()
 
-hb = MultiToneHarmonicBalance('HB1', [1.1e6, 0.9e6], [5, 5])
+hb = MultiToneHarmonicBalance('HB1', [1.1e6, 0.9e6], [3, 3])
 
 converged, freqs, Vf, _, _ = hb.run(y)
 
