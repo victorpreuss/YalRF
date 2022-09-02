@@ -53,7 +53,7 @@ class Opamp():
         self.oppoint['g'] = g
         self.oppoint['Veq'] = Veq
 
-    def calc_oppoint(self, x):
+    def calc_oppoint(self, x, usevlimit=False):
         self.calc_dc(x)
 
     def save_oppoint(self):
